@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="14dp"
+    android:background="@drawable/bg_ad_card"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="198dp">
+
+        <View
+            android:id="@+id/ad_media"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:layout_width="72dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_video_badge"
+            android:gravity="center"
+            android:text="VIDEO"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/ad_brand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textColor="#6D6D6D"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/ad_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#151515"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/ad_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#454545"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/ad_tags"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#1F7A68"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/ad_stats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:textColor="#777777"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/action_video"
+            style="@style/AdActionButton" />
+
+        <TextView
+            android:id="@+id/action_mute"
+            style="@style/AdActionButton"
+            android:layout_marginStart="8dp" />
+
+        <TextView
+            android:id="@+id/action_like"
+            style="@style/AdActionButton"
+            android:layout_marginStart="8dp" />
+
+        <TextView
+            android:id="@+id/action_favorite"
+            style="@style/AdActionButton"
+            android:layout_marginStart="8dp" />
+
+        <TextView
+            android:id="@+id/action_share"
+            style="@style/AdActionButton"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+</LinearLayout>
