@@ -61,12 +61,23 @@ class AdAdapter(
             share.text = "分享"
             video?.text = if (ad.playing) "暂停" else "播放"
             mute?.text = if (ad.muted) "静音" else "有声"
+            video?.visibility = if (ad.playing) View.VISIBLE else View.GONE
+            mute?.visibility = if (ad.playing) View.VISIBLE else View.GONE
 
             media.background = mediaBackground(ad.mediaColor, ad.type)
             like.isSelected = ad.liked
             favorite.isSelected = ad.favorited
 
             itemView.setOnClickListener { onCardClick(ad) }
+            media.setOnClickListener {
+                if (ad.type == AdCardType.VIDEO) {
+                    val showControls = video?.visibility != View.VISIBLE
+                    video?.visibility = if (showControls) View.VISIBLE else View.GONE
+                    mute?.visibility = if (showControls) View.VISIBLE else View.GONE
+                } else {
+                    onCardClick(ad)
+                }
+            }
             like.setOnClickListener { onLikeClick(ad) }
             favorite.setOnClickListener { onFavoriteClick(ad) }
             share.setOnClickListener { onShareClick(ad) }
