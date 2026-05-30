@@ -10,61 +10,76 @@
     android:paddingEnd="18dp">
 
     <LinearLayout
-        android:id="@+id/channel_tabs"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:background="@drawable/bg_tab_container"
-        android:orientation="horizontal"
-        android:padding="4dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tab_featured"
+        <Space
+            android:layout_width="52dp"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/channel_tabs"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="精选"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/tab_commerce"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="电商"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/tab_local"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="本地"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/tab_featured"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="精选"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tab_commerce"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="电商"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tab_local"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="本地"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <View
+                android:id="@+id/tab_indicator"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:layout_gravity="bottom|start"
+                android:background="@drawable/bg_tab_underline" />
+        </FrameLayout>
+
+        <ImageButton
+            android:id="@+id/search_button"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_dark_button"
+            android:contentDescription="搜索"
+            android:padding="10dp"
+            android:src="@drawable/ic_search"
+            android:tint="#FFFFFF" />
     </LinearLayout>
-
-    <EditText
-        android:id="@+id/search_input"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="14dp"
-        android:background="@drawable/bg_search_field"
-        android:hint="用自然语言搜索广告、标签或场景"
-        android:imeOptions="actionSearch"
-        android:inputType="text"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:singleLine="true"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#8C8C8C"
-        android:textSize="15sp" />
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
@@ -73,11 +88,24 @@
         android:layout_marginTop="14dp"
         android:layout_weight="1">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/ad_list"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="22dp" />
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/ad_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="22dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/ad_list_outgoing"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="22dp"
+                android:visibility="gone" />
+        </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </LinearLayout>

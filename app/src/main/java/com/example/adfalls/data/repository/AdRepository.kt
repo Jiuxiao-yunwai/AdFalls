@@ -80,7 +80,7 @@ object AdRepository {
     suspend fun refresh(channel: AdChannel): Boolean = withContext(Dispatchers.IO) {
         seedIfNeeded()
         operationMutex.withLock {
-            requestNextPageLocked(channel, replaceVisible = true).also { changed ->
+            requestFirstPageLocked(channel).also { changed ->
                 if (changed) bumpVisibleRevision()
             }
         }
@@ -181,6 +181,12 @@ object AdRepository {
         if (replaceVisible) visible.clear()
         visible.addAll(candidates.map { it.id })
         return true
+    }
+
+    private suspend fun requestFirstPageLocked(channel: AdChannel): Boolean {
+        requestedIds[channel]?.clear()
+        visibleIds[channel]?.clear()
+        return requestNextPageLocked(channel, replaceVisible = true)
     }
 
     private suspend fun visibleSnapshot(channel: AdChannel): List<Long> {

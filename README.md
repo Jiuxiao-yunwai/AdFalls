@@ -38,7 +38,8 @@ app/build/outputs/apk/debug/app-debug.apk
 - `app/src/main/java/com/example/adfalls/ui/detail`：广告详情页。
 - `app/src/main/java/com/example/adfalls/viewmodel`：首页和详情页的页面状态、交互逻辑。
 - `app/src/main/java/com/example/adfalls/data/model`：广告频道、卡片类型和广告数据模型。
-- `app/src/main/java/com/example/adfalls/data/repository`：本地 mock 数据、互动状态、统计数据和搜索逻辑。
+- `app/src/main/java/com/example/adfalls/data/local`：Room 数据库、广告 Entity 和 DAO。
+- `app/src/main/java/com/example/adfalls/data/repository`：Room 读写入口、本地 mock 数据初始化、互动状态、统计数据和搜索逻辑。
 - `app/src/main/java/com/example/adfalls/cache`：模拟视频播放器资源复用。
 - `res/layout/item_ad_large.xml`：大图广告卡片。
 - `res/layout/item_ad_small.xml`：小图广告卡片。
@@ -46,7 +47,7 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## 当前阶段
 
-当前项目已完成阶段 1：MVVM 基础结构改造，下一步进入 Room 数据层。
+当前项目已完成阶段 3：Room Flow + ViewModel StateFlow 自动状态同步，下一步进入网络和 AI 服务的后续阶段。
 
 阶段进度见：
 
@@ -61,6 +62,7 @@ app/build/outputs/apk/debug/app-debug.apk
 - `docs/架构设计/数据与状态设计.md`
 - `docs/架构设计/模块说明.md`
 - `docs/阶段设计/阶段1-MVVM基础结构.md`
+- `docs/阶段设计/阶段2-Room数据层.md`
 
 ## 后续可接入方向
 

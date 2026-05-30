@@ -4,8 +4,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Parcelable
-import android.text.Editable
-import android.text.TextWatcher
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.View
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
@@ -18,20 +19,30 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.ui.detail.DetailActivity
+import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
 import com.example.adfalls.viewmodel.FeedViewModel
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var tabs: List<TextView>
+    private lateinit var tabIndicator: View
     private lateinit var recyclerView: RecyclerView
+    private lateinit var outgoingRecyclerView: RecyclerView
     private lateinit var layoutManager: LinearLayoutManager
+    private lateinit var outgoingLayoutManager: LinearLayoutManager
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var adapter: AdAdapter
+    private lateinit var outgoingAdapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
+    private lateinit var swipeDetector: GestureDetector
     private val listStates = mutableMapOf<AdChannel, Parcelable?>()
     private var pendingListCommitChannel: AdChannel? = null
     private var pendingListCommit: (() -> Unit)? = null
+    private var currentTabIndex = -1
+    private var pendingSwitchDirection = 0
+    private var outgoingSnapshotReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,22 +59,48 @@ class MainActivity : ComponentActivity() {
         tabs.forEachIndexed { index, tab ->
             tab.setOnClickListener { selectTab(AdChannel.entries[index]) }
         }
+        tabIndicator = findViewById(R.id.tab_indicator)
+        findViewById<View>(R.id.search_button).setOnClickListener { openSearchPage() }
 
+        adapter = createAdapter()
+        outgoingAdapter = createAdapter()
         layoutManager = LinearLayoutManager(this)
-        adapter = AdAdapter(
-            onCardClick = { ad ->
-                viewModel.registerClick(ad.id)
-                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
-            },
-            onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
-            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
-            onShareClick = { ad -> viewModel.share(ad.id) },
-            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
-            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
-        )
+        outgoingLayoutManager = LinearLayoutManager(this)
+
+        outgoingRecyclerView = findViewById(R.id.ad_list_outgoing)
+        outgoingRecyclerView.layoutManager = outgoingLayoutManager
+        outgoingRecyclerView.adapter = outgoingAdapter
+        outgoingRecyclerView.isEnabled = false
+
         recyclerView = findViewById(R.id.ad_list)
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
+        swipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                val start = e1 ?: return false
+                val dx = e2.x - start.x
+                val dy = e2.y - start.y
+                if (abs(dx) < SWIPE_DISTANCE || abs(dx) < abs(dy) * 1.25f || abs(velocityX) < SWIPE_VELOCITY) {
+                    return false
+                }
+                val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
+                val nextIndex = if (dx < 0) currentIndex + 1 else currentIndex - 1
+                if (nextIndex !in AdChannel.entries.indices) return false
+                selectTab(AdChannel.entries[nextIndex])
+                return true
+            }
+        })
+        recyclerView.setOnTouchListener { _, event ->
+            swipeDetector.onTouchEvent(event)
+            false
+        }
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 registerVisibleImpressions()
@@ -89,14 +126,6 @@ class MainActivity : ComponentActivity() {
             recyclerView.scrollToPosition(0)
         }
 
-        findViewById<TextView>(R.id.search_input).addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                viewModel.updateSearchText(s?.toString().orEmpty())
-            }
-            override fun afterTextChanged(s: Editable?) = Unit
-        })
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
@@ -109,37 +138,58 @@ class MainActivity : ComponentActivity() {
         selectTab(AdChannel.FEATURED, restorePosition = false)
     }
 
+    private fun createAdapter(): AdAdapter {
+        return AdAdapter(
+            onCardClick = { ad ->
+                viewModel.registerClick(ad.id)
+                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
+            },
+            onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
+            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
+            onShareClick = { ad -> viewModel.share(ad.id) },
+            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
+            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
+        )
+    }
+
     private fun selectTab(channel: AdChannel, restorePosition: Boolean = true) {
+        val currentChannel = viewModel.uiState.value.activeChannel
+        if (restorePosition && channel == currentChannel) return
         if (::layoutManager.isInitialized) {
-            listStates[viewModel.uiState.value.activeChannel] = layoutManager.onSaveInstanceState()
+            listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
-        viewModel.selectChannel(channel)
-        updateTabs(channel)
-        pendingListCommitChannel = channel
-        pendingListCommit = {
-            if (restorePosition) {
-                listStates[channel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
-            } else {
-                recyclerView.scrollToPosition(0)
+        pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
+        prepareOutgoingList(pendingSwitchDirection) {
+            recyclerView.translationX = offscreenOffset(pendingSwitchDirection)
+            viewModel.selectChannel(channel)
+            updateTabs(channel)
+            pendingListCommitChannel = channel
+            pendingListCommit = {
+                if (restorePosition) {
+                    listStates[channel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
+                } else {
+                    recyclerView.scrollToPosition(0)
+                }
+                registerVisibleImpressions()
             }
-            registerVisibleImpressions()
         }
     }
 
     private fun updateTabs(activeChannel: AdChannel) {
+        val activeIndex = AdChannel.entries.indexOf(activeChannel)
         tabs.forEachIndexed { index, tab ->
-            val selected = AdChannel.entries[index] == activeChannel
-            tab.setTextColor(if (selected) Color.BLACK else Color.rgb(210, 210, 210))
-            tab.setBackgroundResource(
-                if (selected) R.drawable.bg_tab_selected else R.drawable.bg_tab_unselected
-            )
+            tab.setTextColor(if (index == activeIndex) Color.WHITE else Color.rgb(145, 145, 145))
+            tab.setBackgroundColor(Color.TRANSPARENT)
         }
+        moveTabIndicator(activeIndex)
     }
 
     private fun submitAds(state: FeedUiState) {
         adapter.submitAds(state.ads, state.endReached) {
             if (pendingListCommitChannel == null || pendingListCommitChannel == state.activeChannel) {
                 pendingListCommit?.invoke()
+                animatePageSwitch(pendingSwitchDirection)
+                pendingSwitchDirection = 0
                 pendingListCommit = null
                 pendingListCommitChannel = null
             }
@@ -159,5 +209,103 @@ class MainActivity : ComponentActivity() {
             }
         }
         viewModel.registerImpressions(visibleAdIds)
+    }
+
+    private fun moveTabIndicator(activeIndex: Int) {
+        if (activeIndex < 0 || tabs.isEmpty()) return
+        val activeTab = tabs[activeIndex]
+        if (activeTab.width == 0) {
+            tabs.first().post { moveTabIndicator(activeIndex) }
+            return
+        }
+
+        val layoutParams = tabIndicator.layoutParams
+        val extraWidth = (16 * resources.displayMetrics.density).toInt()
+        val textWidth = activeTab.paint.measureText(activeTab.text.toString()).toInt()
+        val indicatorWidth = (textWidth + extraWidth).coerceAtMost(activeTab.width)
+        if (layoutParams.width != indicatorWidth) {
+            layoutParams.width = indicatorWidth
+            tabIndicator.layoutParams = layoutParams
+        }
+
+        val target = activeTab.left + (activeTab.width - indicatorWidth) / 2f
+        if (currentTabIndex == -1) {
+            tabIndicator.translationX = target
+        } else if (currentTabIndex != activeIndex) {
+            tabIndicator.animate()
+                .translationX(target)
+                .setDuration(180L)
+                .start()
+        }
+        currentTabIndex = activeIndex
+    }
+
+    private fun prepareOutgoingList(direction: Int, onReady: () -> Unit) {
+        if (direction == 0 || !::outgoingRecyclerView.isInitialized || recyclerView.width == 0) {
+            onReady()
+            return
+        }
+        outgoingRecyclerView.animate().cancel()
+        recyclerView.animate().cancel()
+        outgoingRecyclerView.translationX = 0f
+        outgoingRecyclerView.alpha = 1f
+        outgoingRecyclerView.visibility = View.INVISIBLE
+        outgoingSnapshotReady = false
+        outgoingAdapter.submitAds(viewModel.uiState.value.ads, viewModel.uiState.value.endReached) {
+            outgoingLayoutManager.onRestoreInstanceState(layoutManager.onSaveInstanceState())
+            outgoingSnapshotReady = true
+            outgoingRecyclerView.visibility = View.VISIBLE
+            onReady()
+        }
+        recyclerView.alpha = 1f
+    }
+
+    private fun animatePageSwitch(direction: Int) {
+        if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) return
+        recyclerView.animate().cancel()
+        outgoingRecyclerView.animate().cancel()
+        if (!outgoingSnapshotReady) return
+        recyclerView.translationX = offscreenOffset(direction)
+        recyclerView.alpha = 1f
+        outgoingRecyclerView.translationX = 0f
+        outgoingRecyclerView.alpha = 1f
+        recyclerView.animate()
+            .translationX(0f)
+            .alpha(1f)
+            .setDuration(PAGE_SWITCH_DURATION)
+            .start()
+        outgoingRecyclerView.animate()
+            .translationX(-offscreenOffset(direction))
+            .alpha(1f)
+            .setDuration(PAGE_SWITCH_DURATION)
+            .withEndAction {
+                outgoingRecyclerView.visibility = View.GONE
+                outgoingRecyclerView.translationX = 0f
+                outgoingSnapshotReady = false
+                outgoingAdapter.submitAds(emptyList(), endReached = false)
+            }
+            .start()
+    }
+
+    private fun offscreenOffset(direction: Int): Float {
+        return (recyclerView.width + pageGapPx()) * direction.toFloat()
+    }
+
+    private fun pageGapPx(): Int {
+        return (PAGE_SWITCH_GAP_DP * resources.displayMetrics.density).toInt()
+    }
+
+    private fun openSearchPage() {
+        startActivity(
+            Intent(this, SearchActivity::class.java)
+                .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
+        )
+    }
+
+    companion object {
+        private const val SWIPE_DISTANCE = 90
+        private const val SWIPE_VELOCITY = 120
+        private const val PAGE_SWITCH_DURATION = 320L
+        private const val PAGE_SWITCH_GAP_DP = 10
     }
 }

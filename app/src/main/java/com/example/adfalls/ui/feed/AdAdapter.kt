@@ -71,10 +71,10 @@ class AdAdapter(
             brand.text = ad.brand
             summary.text = ad.summary
             tags.text = ad.tags.joinToString("  ") { "#$it" }
-            stats.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks} · 分享 ${ad.shares}"
-            like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
-            favorite.text = if (ad.favorited) "已收藏" else "收藏"
-            share.text = "分享"
+            stats.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
+            like.text = if (ad.liked) "♥ ${ad.likes}" else "♡ ${ad.likes}"
+            favorite.text = if (ad.favorited) "★" else "☆"
+            share.text = "↗ ${ad.shares}"
             video?.text = if (ad.playing) "暂停" else "播放"
             mute?.text = if (ad.muted) "静音" else "有声"
             video?.visibility = if (ad.playing) View.VISIBLE else View.GONE
@@ -83,6 +83,9 @@ class AdAdapter(
             media.background = mediaBackground(ad.mediaColor, ad.type)
             like.isSelected = ad.liked
             favorite.isSelected = ad.favorited
+            like.contentDescription = if (ad.liked) "取消点赞" else "点赞"
+            favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
+            share.contentDescription = "分享"
 
             itemView.setOnClickListener { onCardClick(ad) }
             media.setOnClickListener {
