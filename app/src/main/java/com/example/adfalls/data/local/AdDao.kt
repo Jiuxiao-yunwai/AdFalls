@@ -38,6 +38,9 @@ interface AdDao {
     @Query("SELECT * FROM ads WHERE channel = :channel ORDER BY id ASC")
     fun getAdsByChannel(channel: String): List<AdEntity>
 
+    @Query("SELECT * FROM ads WHERE id IN (:ids)")
+    fun getAdsByIds(ids: List<Long>): List<AdEntity>
+
     @Query("SELECT * FROM ads WHERE id = :id LIMIT 1")
     fun getAdById(id: Long): AdEntity?
 
@@ -49,4 +52,7 @@ interface AdDao {
 
     @Query("DELETE FROM ads WHERE channel = :channel")
     fun deleteAdsByChannel(channel: String)
+
+    @Query("DELETE FROM ads")
+    fun deleteAllAds()
 }

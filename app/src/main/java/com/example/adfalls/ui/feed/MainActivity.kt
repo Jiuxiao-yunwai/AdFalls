@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 registerVisibleImpressions()
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
                 if (!viewModel.loadingMore &&
+                    !viewModel.endReached &&
                     viewModel.searchText.isBlank() &&
                     dy > 0 &&
                     lastVisible >= adapter.itemCount - 2
@@ -126,7 +127,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun renderList(onCommitted: (() -> Unit)? = null) {
-        adapter.submitList(viewModel.ads) {
+        adapter.submitAds(viewModel.ads, viewModel.endReached) {
             onCommitted?.invoke()
             registerVisibleImpressions()
         }

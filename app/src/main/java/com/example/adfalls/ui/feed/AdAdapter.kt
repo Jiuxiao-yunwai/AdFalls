@@ -20,22 +20,38 @@ class AdAdapter(
     private val onShareClick: (AdItem) -> Unit,
     private val onVideoClick: (AdItem) -> Unit,
     private val onMuteClick: (AdItem) -> Unit
-) : ListAdapter<AdItem, AdAdapter.AdViewHolder>(Diff) {
+) : ListAdapter<AdItem, RecyclerView.ViewHolder>(Diff) {
+    private var showEndReached = false
 
-    override fun getItemViewType(position: Int): Int = when (getItem(position).type) {
-        AdCardType.LARGE_IMAGE -> R.layout.item_ad_large
-        AdCardType.SMALL_IMAGE -> R.layout.item_ad_small
-        AdCardType.VIDEO -> R.layout.item_ad_video
+    fun submitAds(items: List<AdItem>, endReached: Boolean, commitCallback: (() -> Unit)? = null) {
+        showEndReached = endReached
+        submitList(items) {
+            notifyDataSetChanged()
+            commitCallback?.invoke()
+        }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AdViewHolder {
+    override fun getItemCount(): Int = super.getItemCount() + if (showEndReached) 1 else 0
+
+    override fun getItemViewType(position: Int): Int {
+        if (showEndReached && position == currentList.size) return R.layout.item_feed_end
+        return when (getItem(position).type) {
+            AdCardType.LARGE_IMAGE -> R.layout.item_ad_large
+            AdCardType.SMALL_IMAGE -> R.layout.item_ad_small
+            AdCardType.VIDEO -> R.layout.item_ad_video
+        }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(viewType, parent, false)
-        return AdViewHolder(view)
+        return if (viewType == R.layout.item_feed_end) EndViewHolder(view) else AdViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: AdViewHolder, position: Int) {
-        holder.bind(getItem(position))
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is AdViewHolder) holder.bind(getItem(position))
     }
+
+    private class EndViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 
     inner class AdViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val media: View = itemView.findViewById(R.id.ad_media)

@@ -16,6 +16,9 @@ class FeedViewModel : ViewModel() {
     var loadingMore: Boolean = false
         private set
 
+    var endReached: Boolean = false
+        private set
+
     var ads: List<AdItem> = emptyList()
         private set
 
@@ -25,16 +28,19 @@ class FeedViewModel : ViewModel() {
 
     fun selectChannel(channel: AdChannel) {
         activeChannel = channel
+        endReached = false
         syncAds()
     }
 
     fun updateSearchText(text: String) {
         searchText = text
+        endReached = false
         syncAds()
     }
 
     fun refresh() {
         AdRepository.refresh(activeChannel)
+        endReached = false
         syncAds()
     }
 
@@ -42,7 +48,7 @@ class FeedViewModel : ViewModel() {
         if (loadingMore || searchText.isNotBlank()) return
         loadingMore = true
         try {
-            AdRepository.loadMore(activeChannel)
+            endReached = !AdRepository.loadMore(activeChannel)
             syncAds()
         } finally {
             loadingMore = false
