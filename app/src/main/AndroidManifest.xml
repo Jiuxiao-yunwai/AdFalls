@@ -31,6 +31,11 @@
             android:exported="false"
             android:label="@string/app_name"
             android:theme="@style/Theme.AdFalls" />
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.AdFalls" />
     </application>
 
 </manifest>

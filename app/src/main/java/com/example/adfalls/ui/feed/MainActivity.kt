@@ -1,17 +1,12 @@
 package com.example.adfalls.ui.feed
 
 import android.content.Intent
-import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Parcelable
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
-import android.view.inputmethod.InputMethodManager
-import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
@@ -24,6 +19,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.ui.detail.DetailActivity
+import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
 import com.example.adfalls.viewmodel.FeedViewModel
 import kotlin.math.abs
@@ -32,8 +28,6 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private lateinit var tabs: List<TextView>
     private lateinit var tabIndicator: View
-    private lateinit var searchPanel: View
-    private lateinit var searchInput: EditText
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var swipeRefresh: SwipeRefreshLayout
@@ -44,13 +38,12 @@ class MainActivity : ComponentActivity() {
     private var pendingListCommitChannel: AdChannel? = null
     private var pendingListCommit: (() -> Unit)? = null
     private var currentTabIndex = -1
+    private var pendingSwitchDirection = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(244, 246, 248)
-        window.navigationBarColor = Color.rgb(244, 246, 248)
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.statusBarColor = Color.BLACK
+        window.navigationBarColor = Color.BLACK
         setContentView(R.layout.activity_main)
         viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
 
@@ -63,9 +56,7 @@ class MainActivity : ComponentActivity() {
             tab.setOnClickListener { selectTab(AdChannel.entries[index]) }
         }
         tabIndicator = findViewById(R.id.tab_indicator)
-        searchPanel = findViewById(R.id.search_panel)
-        searchInput = findViewById(R.id.search_input)
-        findViewById<View>(R.id.search_button).setOnClickListener { toggleSearchPanel() }
+        findViewById<View>(R.id.search_button).setOnClickListener { openSearchPage() }
 
         layoutManager = LinearLayoutManager(this)
         adapter = AdAdapter(
@@ -125,21 +116,13 @@ class MainActivity : ComponentActivity() {
         })
 
         swipeRefresh = findViewById(R.id.swipe_refresh)
-        swipeRefresh.setColorSchemeColors(Color.rgb(78, 164, 255), Color.rgb(31, 122, 104))
-        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.WHITE)
+        swipeRefresh.setColorSchemeColors(Color.WHITE, Color.rgb(78, 164, 255))
+        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.rgb(28, 28, 28))
         swipeRefresh.setOnRefreshListener {
             viewModel.refresh()
             swipeRefresh.isRefreshing = false
             recyclerView.scrollToPosition(0)
         }
-
-        searchInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                viewModel.updateSearchText(s?.toString().orEmpty())
-            }
-            override fun afterTextChanged(s: Editable?) = Unit
-        })
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -159,7 +142,7 @@ class MainActivity : ComponentActivity() {
         if (::layoutManager.isInitialized) {
             listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
-        animateListSwitch(AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel))
+        pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
         viewModel.selectChannel(channel)
         updateTabs(channel)
         pendingListCommitChannel = channel
@@ -176,7 +159,7 @@ class MainActivity : ComponentActivity() {
     private fun updateTabs(activeChannel: AdChannel) {
         val activeIndex = AdChannel.entries.indexOf(activeChannel)
         tabs.forEachIndexed { index, tab ->
-            tab.setTextColor(if (index == activeIndex) Color.rgb(17, 17, 17) else Color.rgb(118, 118, 118))
+            tab.setTextColor(if (index == activeIndex) Color.WHITE else Color.rgb(145, 145, 145))
             tab.setBackgroundColor(Color.TRANSPARENT)
         }
         moveTabIndicator(activeIndex)
@@ -186,6 +169,8 @@ class MainActivity : ComponentActivity() {
         adapter.submitAds(state.ads, state.endReached) {
             if (pendingListCommitChannel == null || pendingListCommitChannel == state.activeChannel) {
                 pendingListCommit?.invoke()
+                animateListEnter(pendingSwitchDirection)
+                pendingSwitchDirection = 0
                 pendingListCommit = null
                 pendingListCommitChannel = null
             }
@@ -234,31 +219,23 @@ class MainActivity : ComponentActivity() {
         currentTabIndex = activeIndex
     }
 
-    private fun animateListSwitch(direction: Int) {
-        if (direction == 0 || !::recyclerView.isInitialized) return
+    private fun animateListEnter(direction: Int) {
+        if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) return
         recyclerView.animate().cancel()
-        recyclerView.translationX = 28f * direction
-        recyclerView.alpha = 0.88f
+        recyclerView.translationX = recyclerView.width * direction.toFloat()
+        recyclerView.alpha = 0.65f
         recyclerView.animate()
             .translationX(0f)
             .alpha(1f)
-            .setDuration(180L)
+            .setDuration(260L)
             .start()
     }
 
-    private fun toggleSearchPanel() {
-        val shouldShow = searchPanel.visibility != View.VISIBLE
-        searchPanel.visibility = if (shouldShow) View.VISIBLE else View.GONE
-        if (shouldShow) {
-            searchInput.requestFocus()
-            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                .showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT)
-        } else {
-            searchInput.text?.clear()
-            searchInput.clearFocus()
-            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-                .hideSoftInputFromWindow(searchInput.windowToken, 0)
-        }
+    private fun openSearchPage() {
+        startActivity(
+            Intent(this, SearchActivity::class.java)
+                .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
+        )
     }
 
     companion object {
