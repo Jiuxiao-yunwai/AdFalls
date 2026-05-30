@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private var pendingListCommit: (() -> Unit)? = null
     private var currentTabIndex = -1
     private var pendingSwitchDirection = 0
+    private var outgoingSnapshotReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,17 +159,19 @@ class MainActivity : ComponentActivity() {
             listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
         pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
-        prepareOutgoingList(pendingSwitchDirection)
-        viewModel.selectChannel(channel)
-        updateTabs(channel)
-        pendingListCommitChannel = channel
-        pendingListCommit = {
-            if (restorePosition) {
-                listStates[channel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
-            } else {
-                recyclerView.scrollToPosition(0)
+        prepareOutgoingList(pendingSwitchDirection) {
+            recyclerView.translationX = offscreenOffset(pendingSwitchDirection)
+            viewModel.selectChannel(channel)
+            updateTabs(channel)
+            pendingListCommitChannel = channel
+            pendingListCommit = {
+                if (restorePosition) {
+                    listStates[channel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
+                } else {
+                    recyclerView.scrollToPosition(0)
+                }
+                registerVisibleImpressions()
             }
-            registerVisibleImpressions()
         }
     }
 
@@ -237,17 +240,23 @@ class MainActivity : ComponentActivity() {
         currentTabIndex = activeIndex
     }
 
-    private fun prepareOutgoingList(direction: Int) {
-        if (direction == 0 || !::outgoingRecyclerView.isInitialized || recyclerView.width == 0) return
+    private fun prepareOutgoingList(direction: Int, onReady: () -> Unit) {
+        if (direction == 0 || !::outgoingRecyclerView.isInitialized || recyclerView.width == 0) {
+            onReady()
+            return
+        }
         outgoingRecyclerView.animate().cancel()
         recyclerView.animate().cancel()
         outgoingRecyclerView.translationX = 0f
         outgoingRecyclerView.alpha = 1f
-        outgoingRecyclerView.visibility = View.VISIBLE
+        outgoingRecyclerView.visibility = View.INVISIBLE
+        outgoingSnapshotReady = false
         outgoingAdapter.submitAds(viewModel.uiState.value.ads, viewModel.uiState.value.endReached) {
             outgoingLayoutManager.onRestoreInstanceState(layoutManager.onSaveInstanceState())
+            outgoingSnapshotReady = true
+            outgoingRecyclerView.visibility = View.VISIBLE
+            onReady()
         }
-        recyclerView.translationX = recyclerView.width * direction.toFloat()
         recyclerView.alpha = 1f
     }
 
@@ -255,7 +264,8 @@ class MainActivity : ComponentActivity() {
         if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) return
         recyclerView.animate().cancel()
         outgoingRecyclerView.animate().cancel()
-        recyclerView.translationX = recyclerView.width * direction.toFloat()
+        if (!outgoingSnapshotReady) return
+        recyclerView.translationX = offscreenOffset(direction)
         recyclerView.alpha = 1f
         outgoingRecyclerView.translationX = 0f
         outgoingRecyclerView.alpha = 1f
@@ -265,15 +275,24 @@ class MainActivity : ComponentActivity() {
             .setDuration(PAGE_SWITCH_DURATION)
             .start()
         outgoingRecyclerView.animate()
-            .translationX(-recyclerView.width * direction.toFloat())
+            .translationX(-offscreenOffset(direction))
             .alpha(1f)
             .setDuration(PAGE_SWITCH_DURATION)
             .withEndAction {
                 outgoingRecyclerView.visibility = View.GONE
                 outgoingRecyclerView.translationX = 0f
+                outgoingSnapshotReady = false
                 outgoingAdapter.submitAds(emptyList(), endReached = false)
             }
             .start()
+    }
+
+    private fun offscreenOffset(direction: Int): Float {
+        return (recyclerView.width + pageGapPx()) * direction.toFloat()
+    }
+
+    private fun pageGapPx(): Int {
+        return (PAGE_SWITCH_GAP_DP * resources.displayMetrics.density).toInt()
     }
 
     private fun openSearchPage() {
@@ -287,5 +306,6 @@ class MainActivity : ComponentActivity() {
         private const val SWIPE_DISTANCE = 90
         private const val SWIPE_VELOCITY = 120
         private const val PAGE_SWITCH_DURATION = 320L
+        private const val PAGE_SWITCH_GAP_DP = 10
     }
 }
