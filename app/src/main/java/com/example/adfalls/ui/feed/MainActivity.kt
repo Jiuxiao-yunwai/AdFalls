@@ -29,9 +29,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var tabs: List<TextView>
     private lateinit var tabIndicator: View
     private lateinit var recyclerView: RecyclerView
+    private lateinit var outgoingRecyclerView: RecyclerView
     private lateinit var layoutManager: LinearLayoutManager
+    private lateinit var outgoingLayoutManager: LinearLayoutManager
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var adapter: AdAdapter
+    private lateinit var outgoingAdapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
     private lateinit var swipeDetector: GestureDetector
     private val listStates = mutableMapOf<AdChannel, Parcelable?>()
@@ -58,18 +61,16 @@ class MainActivity : ComponentActivity() {
         tabIndicator = findViewById(R.id.tab_indicator)
         findViewById<View>(R.id.search_button).setOnClickListener { openSearchPage() }
 
+        adapter = createAdapter()
+        outgoingAdapter = createAdapter()
         layoutManager = LinearLayoutManager(this)
-        adapter = AdAdapter(
-            onCardClick = { ad ->
-                viewModel.registerClick(ad.id)
-                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
-            },
-            onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
-            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
-            onShareClick = { ad -> viewModel.share(ad.id) },
-            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
-            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
-        )
+        outgoingLayoutManager = LinearLayoutManager(this)
+
+        outgoingRecyclerView = findViewById(R.id.ad_list_outgoing)
+        outgoingRecyclerView.layoutManager = outgoingLayoutManager
+        outgoingRecyclerView.adapter = outgoingAdapter
+        outgoingRecyclerView.isEnabled = false
+
         recyclerView = findViewById(R.id.ad_list)
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
@@ -136,6 +137,20 @@ class MainActivity : ComponentActivity() {
         selectTab(AdChannel.FEATURED, restorePosition = false)
     }
 
+    private fun createAdapter(): AdAdapter {
+        return AdAdapter(
+            onCardClick = { ad ->
+                viewModel.registerClick(ad.id)
+                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
+            },
+            onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
+            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
+            onShareClick = { ad -> viewModel.share(ad.id) },
+            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
+            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
+        )
+    }
+
     private fun selectTab(channel: AdChannel, restorePosition: Boolean = true) {
         val currentChannel = viewModel.uiState.value.activeChannel
         if (restorePosition && channel == currentChannel) return
@@ -143,6 +158,7 @@ class MainActivity : ComponentActivity() {
             listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
         pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
+        prepareOutgoingList(pendingSwitchDirection)
         viewModel.selectChannel(channel)
         updateTabs(channel)
         pendingListCommitChannel = channel
@@ -169,7 +185,7 @@ class MainActivity : ComponentActivity() {
         adapter.submitAds(state.ads, state.endReached) {
             if (pendingListCommitChannel == null || pendingListCommitChannel == state.activeChannel) {
                 pendingListCommit?.invoke()
-                animateListEnter(pendingSwitchDirection)
+                animatePageSwitch(pendingSwitchDirection)
                 pendingSwitchDirection = 0
                 pendingListCommit = null
                 pendingListCommitChannel = null
@@ -221,15 +237,42 @@ class MainActivity : ComponentActivity() {
         currentTabIndex = activeIndex
     }
 
-    private fun animateListEnter(direction: Int) {
+    private fun prepareOutgoingList(direction: Int) {
+        if (direction == 0 || !::outgoingRecyclerView.isInitialized || recyclerView.width == 0) return
+        outgoingRecyclerView.animate().cancel()
+        recyclerView.animate().cancel()
+        outgoingRecyclerView.translationX = 0f
+        outgoingRecyclerView.alpha = 1f
+        outgoingRecyclerView.visibility = View.VISIBLE
+        outgoingAdapter.submitAds(viewModel.uiState.value.ads, viewModel.uiState.value.endReached) {
+            outgoingLayoutManager.onRestoreInstanceState(layoutManager.onSaveInstanceState())
+        }
+        recyclerView.translationX = recyclerView.width * direction.toFloat()
+        recyclerView.alpha = 1f
+    }
+
+    private fun animatePageSwitch(direction: Int) {
         if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) return
         recyclerView.animate().cancel()
+        outgoingRecyclerView.animate().cancel()
         recyclerView.translationX = recyclerView.width * direction.toFloat()
-        recyclerView.alpha = 0.65f
+        recyclerView.alpha = 1f
+        outgoingRecyclerView.translationX = 0f
+        outgoingRecyclerView.alpha = 1f
         recyclerView.animate()
             .translationX(0f)
             .alpha(1f)
-            .setDuration(260L)
+            .setDuration(PAGE_SWITCH_DURATION)
+            .start()
+        outgoingRecyclerView.animate()
+            .translationX(-recyclerView.width * direction.toFloat())
+            .alpha(1f)
+            .setDuration(PAGE_SWITCH_DURATION)
+            .withEndAction {
+                outgoingRecyclerView.visibility = View.GONE
+                outgoingRecyclerView.translationX = 0f
+                outgoingAdapter.submitAds(emptyList(), endReached = false)
+            }
             .start()
     }
 
@@ -243,5 +286,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val SWIPE_DISTANCE = 90
         private const val SWIPE_VELOCITY = 120
+        private const val PAGE_SWITCH_DURATION = 320L
     }
 }
