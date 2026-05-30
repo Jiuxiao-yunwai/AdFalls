@@ -43,6 +43,21 @@ app/build/outputs/apk/debug/app-debug.apk
 - `res/layout/item_ad_small.xml`：小图广告卡片。
 - `res/layout/item_ad_video.xml`：视频广告卡片。
 
+## 当前阶段
+
+当前项目已经完成基础信息流 Demo，下一步进入 MVVM 改造。
+
+阶段进度见：
+
+- `docs/进度.md`
+
+技术和开发约定见：
+
+- `docs/技术.md`
+- `docs/架构方案.md`
+- `docs/数据与状态设计.md`
+- `docs/开发路线.md`
+
 ## 后续可接入方向
 
 - 将 `AdRepository` 替换为真实网络请求，例如 OkHttp。
