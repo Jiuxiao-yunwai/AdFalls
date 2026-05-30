@@ -1,4 +1,4 @@
-package com.example.adfalls
+package com.example.adfalls.ui.feed
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -9,6 +9,9 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.adfalls.R
+import com.example.adfalls.data.model.AdCardType
+import com.example.adfalls.data.model.AdItem
 
 class AdAdapter(
     private val onCardClick: (AdItem) -> Unit,

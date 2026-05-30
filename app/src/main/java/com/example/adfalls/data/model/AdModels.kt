@@ -1,4 +1,4 @@
-package com.example.adfalls
+package com.example.adfalls.data.model
 
 enum class AdChannel(val title: String) {
     FEATURED("精选"),

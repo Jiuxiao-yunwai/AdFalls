@@ -1,4 +1,6 @@
-package com.example.adfalls
+package com.example.adfalls.cache
+
+import com.example.adfalls.data.repository.AdRepository
 
 object VideoPlaybackPool {
     private var activeVideoId: Long? = null

@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AdFalls">
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.feed.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AdFalls">
@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".DetailActivity"
+            android:name=".ui.detail.DetailActivity"
             android:exported="false"
             android:label="@string/app_name"
             android:theme="@style/Theme.AdFalls" />

@@ -34,29 +34,33 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## 主要结构
 
-- `MainActivity.kt`：信息流首页、频道切换、搜索、刷新加载、曝光统计。
-- `DetailActivity.kt`：广告详情页和互动操作。
-- `AdAdapter.kt`：RecyclerView 多类型卡片适配器。
-- `AdRepository.kt`：本地 mock 数据、互动状态、统计数据和搜索逻辑。
-- `VideoPlaybackPool.kt`：模拟视频播放器资源复用。
+- `app/src/main/java/com/example/adfalls/ui/feed`：信息流首页和 RecyclerView 多类型卡片适配器。
+- `app/src/main/java/com/example/adfalls/ui/detail`：广告详情页。
+- `app/src/main/java/com/example/adfalls/viewmodel`：首页和详情页的页面状态、交互逻辑。
+- `app/src/main/java/com/example/adfalls/data/model`：广告频道、卡片类型和广告数据模型。
+- `app/src/main/java/com/example/adfalls/data/repository`：本地 mock 数据、互动状态、统计数据和搜索逻辑。
+- `app/src/main/java/com/example/adfalls/cache`：模拟视频播放器资源复用。
 - `res/layout/item_ad_large.xml`：大图广告卡片。
 - `res/layout/item_ad_small.xml`：小图广告卡片。
 - `res/layout/item_ad_video.xml`：视频广告卡片。
 
 ## 当前阶段
 
-当前项目已经完成基础信息流 Demo，下一步进入 MVVM 改造。
+当前项目已完成阶段 1：MVVM 基础结构改造，下一步进入 Room 数据层。
 
 阶段进度见：
 
-- `docs/进度.md`
+- `docs/项目管理/进度.md`
 
 技术和开发约定见：
 
-- `docs/技术.md`
-- `docs/架构方案.md`
-- `docs/数据与状态设计.md`
-- `docs/开发路线.md`
+- `docs/README.md`
+- `docs/项目管理/开发路线.md`
+- `docs/架构设计/技术.md`
+- `docs/架构设计/架构方案.md`
+- `docs/架构设计/数据与状态设计.md`
+- `docs/架构设计/模块说明.md`
+- `docs/阶段设计/阶段1-MVVM基础结构.md`
 
 ## 后续可接入方向
 

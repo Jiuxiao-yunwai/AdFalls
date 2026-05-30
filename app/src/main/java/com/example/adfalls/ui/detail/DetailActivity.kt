@@ -1,21 +1,26 @@
-package com.example.adfalls
+package com.example.adfalls.ui.detail
 
-import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.ViewModelProvider
+import com.example.adfalls.R
+import com.example.adfalls.data.model.AdCardType
+import com.example.adfalls.viewmodel.DetailViewModel
 
-class DetailActivity : Activity() {
-    private var adId: Long = -1L
+class DetailActivity : ComponentActivity() {
+    private lateinit var viewModel: DetailViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
         setContentView(R.layout.activity_detail)
-        adId = intent.getLongExtra(EXTRA_AD_ID, -1L)
+        viewModel = ViewModelProvider.create(this)[DetailViewModel::class]
+        viewModel.loadAd(intent.getLongExtra(EXTRA_AD_ID, -1L))
 
         findViewById<View>(R.id.back_button).setOnClickListener { finish() }
         bind()
@@ -23,23 +28,18 @@ class DetailActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        val ad = AdRepository.findAd(adId)
-        if (ad?.type == AdCardType.VIDEO) {
-            VideoPlaybackPool.play(adId)
-            bind()
-        }
+        viewModel.playVideo()
+        bind()
     }
 
     override fun onPause() {
-        val ad = AdRepository.findAd(adId)
-        if (ad?.type == AdCardType.VIDEO) {
-            VideoPlaybackPool.pause(adId)
-        }
+        viewModel.pauseVideo()
         super.onPause()
     }
 
     private fun bind() {
-        val ad = AdRepository.findAd(adId) ?: run {
+        viewModel.sync()
+        val ad = viewModel.ad ?: run {
             finish()
             return
         }
@@ -72,23 +72,23 @@ class DetailActivity : Activity() {
         mute.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
 
         like.setOnClickListener {
-            AdRepository.toggleLike(adId)
+            viewModel.toggleLike()
             bind()
         }
         favorite.setOnClickListener {
-            AdRepository.toggleFavorite(adId)
+            viewModel.toggleFavorite()
             bind()
         }
         share.setOnClickListener {
-            AdRepository.share(adId)
+            viewModel.share()
             bind()
         }
         video.setOnClickListener {
-            VideoPlaybackPool.togglePlay(adId)
+            viewModel.toggleVideoPlay()
             bind()
         }
         mute.setOnClickListener {
-            VideoPlaybackPool.toggleMute(adId)
+            viewModel.toggleMute()
             bind()
         }
     }

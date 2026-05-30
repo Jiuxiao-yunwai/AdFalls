@@ -1,6 +1,9 @@
-package com.example.adfalls
+package com.example.adfalls.data.repository
 
 import android.graphics.Color
+import com.example.adfalls.data.model.AdCardType
+import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.data.model.AdItem
 
 object AdRepository {
     private const val PAGE_SIZE = 6
