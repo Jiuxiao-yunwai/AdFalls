@@ -1,6 +1,11 @@
 package com.example.adfalls.data.repository
 
+import android.content.Context
 import android.graphics.Color
+import com.example.adfalls.data.local.AdDao
+import com.example.adfalls.data.local.AppDatabase
+import com.example.adfalls.data.local.toEntity
+import com.example.adfalls.data.local.toModel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdItem
@@ -8,7 +13,7 @@ import com.example.adfalls.data.model.AdItem
 object AdRepository {
     private const val PAGE_SIZE = 6
     private var nextId = 100L
-    private val ads = mutableMapOf<AdChannel, MutableList<AdItem>>()
+    private var adDao: AdDao? = null
     private val exposedIds = mutableSetOf<Long>()
     private val palette = listOf(
         Color.rgb(78, 164, 255),
@@ -19,13 +24,19 @@ object AdRepository {
         Color.rgb(58, 202, 214)
     )
 
-    init {
-        AdChannel.entries.forEach { channel ->
-            ads[channel] = seedAds(channel).toMutableList()
+    fun initialize(context: Context) {
+        if (adDao != null) return
+        val dao = AppDatabase.getInstance(context).adDao()
+        adDao = dao
+        if (dao.countAds() == 0) {
+            dao.insertAds(AdChannel.entries.flatMap(::seedAds).map { it.toEntity() })
         }
+        nextId = maxOf(100L, (dao.maxAdId() ?: 99L) + 1L)
     }
 
-    fun getAds(channel: AdChannel): List<AdItem> = ads[channel].orEmpty()
+    fun getAds(channel: AdChannel): List<AdItem> {
+        return dao().getAdsByChannel(channel.name).map { it.toModel() }
+    }
 
     fun search(channel: AdChannel, query: String): List<AdItem> {
         val trimmed = query.trim()
@@ -39,20 +50,22 @@ object AdRepository {
     }
 
     fun findAd(id: Long): AdItem? {
-        return ads.values.asSequence().flatten().firstOrNull { it.id == id }
+        return dao().getAdById(id)?.toModel()
     }
 
     fun refresh(channel: AdChannel): List<AdItem> {
         val refreshed = seedAds(channel).mapIndexed { index, ad ->
             ad.copy(id = channel.ordinal * 1000L + index + nextId++)
         }
-        ads[channel] = refreshed.toMutableList()
+        dao().deleteAdsByChannel(channel.name)
+        dao().insertAds(refreshed.map { it.toEntity() })
         return getAds(channel)
     }
 
     fun loadMore(channel: AdChannel): List<AdItem> {
+        val currentSize = getAds(channel).size
         val more = List(PAGE_SIZE) { index ->
-            val type = AdCardType.entries[(index + ads[channel].orEmpty().size) % AdCardType.entries.size]
+            val type = AdCardType.entries[(index + currentSize) % AdCardType.entries.size]
             val id = nextId++
             AdItem(
                 id = id,
@@ -68,32 +81,33 @@ object AdRepository {
                 shares = 3 + index
             )
         }
-        ads.getValue(channel).addAll(more)
+        dao().insertAds(more.map { it.toEntity() })
         return getAds(channel)
     }
 
     fun toggleLike(id: Long) {
-        update(id) { ad ->
+        findAd(id)?.let { ad ->
             val liked = !ad.liked
-            ad.copy(liked = liked, likes = (ad.likes + if (liked) 1 else -1).coerceAtLeast(0))
+            val likes = (ad.likes + if (liked) 1 else -1).coerceAtLeast(0)
+            dao().updateLike(id, liked, likes)
         }
     }
 
     fun toggleFavorite(id: Long) {
-        update(id) { it.copy(favorited = !it.favorited) }
+        findAd(id)?.let { dao().updateFavorite(id, !it.favorited) }
     }
 
     fun share(id: Long) {
-        update(id) { it.copy(shares = it.shares + 1) }
+        dao().addShare(id)
     }
 
     fun registerClick(id: Long) {
-        update(id) { it.copy(clicks = it.clicks + 1) }
+        dao().addClick(id)
     }
 
     fun registerImpression(id: Long): Boolean {
         return if (exposedIds.add(id)) {
-            update(id) { it.copy(impressions = it.impressions + 1) }
+            dao().addImpression(id)
             true
         } else {
             false
@@ -101,22 +115,17 @@ object AdRepository {
     }
 
     fun setVideoState(id: Long, playing: Boolean? = null, muted: Boolean? = null) {
-        update(id) { ad ->
-            ad.copy(
+        findAd(id)?.let { ad ->
+            dao().updateVideoState(
+                id = id,
                 playing = playing ?: ad.playing,
                 muted = muted ?: ad.muted
             )
         }
     }
 
-    private fun update(id: Long, transform: (AdItem) -> AdItem) {
-        ads.values.forEach { list ->
-            val index = list.indexOfFirst { it.id == id }
-            if (index >= 0) {
-                list[index] = transform(list[index])
-                return
-            }
-        }
+    private fun dao(): AdDao {
+        return checkNotNull(adDao) { "AdRepository must be initialized from AdFallsApp before use." }
     }
 
     private fun seedAds(channel: AdChannel): List<AdItem> {
