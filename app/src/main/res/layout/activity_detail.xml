@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050505"
+    android:background="#F4F6F8"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -13,20 +13,21 @@
 
         <TextView
             android:id="@+id/back_button"
-            android:layout_width="70dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_dark_button"
+            android:layout_width="48dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_action_button"
             android:gravity="center"
-            android:text="返回"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:text="‹"
+            android:textColor="#222222"
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/detail_channel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            android:textColor="#9EE7D5"
+            android:textColor="#1F7A68"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -35,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textColor="#FFFFFF"
+            android:textColor="#111111"
             android:textSize="27sp"
             android:textStyle="bold" />
 
@@ -44,7 +45,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textColor="#BDBDBD"
+            android:textColor="#646464"
             android:textSize="14sp" />
 
         <FrameLayout
@@ -92,7 +93,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
             android:lineSpacingExtra="3dp"
-            android:textColor="#FFFFFF"
+            android:textColor="#202020"
             android:textSize="16sp" />
 
         <TextView
@@ -101,7 +102,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:lineSpacingExtra="3dp"
-            android:textColor="#CFCFCF"
+            android:textColor="#4A4A4A"
             android:textSize="15sp" />
 
         <TextView
@@ -109,7 +110,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:textColor="#9EE7D5"
+            android:textColor="#1F7A68"
             android:textSize="14sp" />
 
         <TextView
@@ -117,7 +118,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:textColor="#9A9A9A"
+            android:textColor="#777777"
             android:textSize="13sp" />
 
         <LinearLayout
