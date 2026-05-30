@@ -12,7 +12,7 @@ import com.example.adfalls.data.model.AdItem
 
 object AdRepository {
     private const val PAGE_SIZE = 6
-    private const val FIXED_AD_COUNT = 20
+    private const val FIXED_AD_COUNT = 50
     private var adDao: AdDao? = null
     private val visibleIds = mutableMapOf<AdChannel, MutableList<Long>>()
     private val requestedIds = mutableMapOf<AdChannel, MutableSet<Long>>()
@@ -139,7 +139,7 @@ object AdRepository {
     }
 
     private fun fixedAds(): List<AdItem> {
-        return listOf(
+        val baseAds = listOf(
             ad(1, AdChannel.FEATURED, AdCardType.LARGE_IMAGE, "城市夜跑能量补给", "PulseRun", listOf("运动", "年轻人", "高转化"), 24, 5),
             ad(2, AdChannel.FEATURED, AdCardType.SMALL_IMAGE, "周末露营轻装备", "CampGo", listOf("户外", "轻量", "周末"), 27, 6),
             ad(3, AdChannel.FEATURED, AdCardType.VIDEO, "通勤咖啡订阅", "BrewNow", listOf("咖啡", "白领", "订阅"), 30, 7),
@@ -161,6 +161,37 @@ object AdRepository {
             ad(19, AdChannel.LOCAL, AdCardType.SMALL_IMAGE, "街区咖啡地图", "BeanWalk", listOf("咖啡", "街区", "探店"), 23, 5),
             ad(20, AdChannel.LOCAL, AdCardType.VIDEO, "夜间市集攻略", "NightBazaar", listOf("市集", "夜生活", "本地"), 26, 6)
         )
+        return baseAds + generatedAds(startId = baseAds.size + 1L, count = FIXED_AD_COUNT - baseAds.size)
+    }
+
+    private fun generatedAds(startId: Long, count: Int): List<AdItem> {
+        val themes = listOf(
+            AdSeed(AdChannel.FEATURED, "晨间效率计划", "Mornly", listOf("效率", "晨间", "习惯")),
+            AdSeed(AdChannel.FEATURED, "旅行收纳灵感", "PackPro", listOf("旅行", "收纳", "轻便")),
+            AdSeed(AdChannel.FEATURED, "城市快闪体验", "PopSpot", listOf("快闪", "体验", "年轻人")),
+            AdSeed(AdChannel.COMMERCE, "夏日防晒套装", "Sunly", listOf("防晒", "夏日", "护肤")),
+            AdSeed(AdChannel.COMMERCE, "智能睡眠枕", "SleepLab", listOf("睡眠", "智能", "家居")),
+            AdSeed(AdChannel.COMMERCE, "办公零食补给", "SnackHub", listOf("零食", "办公", "补给")),
+            AdSeed(AdChannel.COMMERCE, "儿童学习平板", "KidTab", listOf("教育", "儿童", "数码")),
+            AdSeed(AdChannel.LOCAL, "周末音乐小现场", "LiveCorner", listOf("音乐", "周末", "本地")),
+            AdSeed(AdChannel.LOCAL, "社区旧物交换", "SwapDay", listOf("社区", "环保", "交换")),
+            AdSeed(AdChannel.LOCAL, "城市徒步路线", "WalkMap", listOf("徒步", "城市", "路线"))
+        )
+        return List(count) { index ->
+            val id = startId + index
+            val seed = themes[index % themes.size]
+            val type = AdCardType.entries[index % AdCardType.entries.size]
+            ad(
+                id = id,
+                channel = seed.channel,
+                type = type,
+                title = "${seed.title} ${index / themes.size + 1}",
+                brand = seed.brand,
+                tags = seed.tags,
+                likes = 14 + index,
+                shares = 3 + index % 8
+            )
+        }
     }
 
     private fun ad(
@@ -187,5 +218,12 @@ object AdRepository {
             shares = shares
         )
     }
+
+    private data class AdSeed(
+        val channel: AdChannel,
+        val title: String,
+        val brand: String,
+        val tags: List<String>
+    )
 
 }

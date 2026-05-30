@@ -6,7 +6,7 @@
 
 - 新增 Room 本地数据库层。
 - 保留现有 mock 数据生成逻辑。
-- 首次启动时把 20 条固定 mock 数据写入 Room。
+- 首次启动时把 50 条固定 mock 数据写入 Room。
 - 后续列表、详情和互动状态从 Room 读写。
 - 继续保持 Activity 和 ViewModel 不直接访问 Room、DAO、Entity。
 
@@ -37,7 +37,7 @@ AdDao / Room
 `AdRepository` 现在负责：
 
 - 初始化 Room。
-- 首次启动写入 20 条固定 mock 广告。
+- 首次启动写入 50 条固定 mock 广告。
 - 从 Room 读取频道列表和详情。
 - 基于 Room 数据执行搜索。
 - 维护当前频道已展示 ID 和已请求过 ID。
