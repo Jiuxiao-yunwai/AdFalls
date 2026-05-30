@@ -6,10 +6,16 @@ import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdCardType
+import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.viewmodel.DetailUiState
 import com.example.adfalls.viewmodel.DetailViewModel
+import kotlinx.coroutines.launch
 
 class DetailActivity : ComponentActivity() {
     private lateinit var viewModel: DetailViewModel
@@ -23,13 +29,17 @@ class DetailActivity : ComponentActivity() {
         viewModel.loadAd(intent.getLongExtra(EXTRA_AD_ID, -1L))
 
         findViewById<View>(R.id.back_button).setOnClickListener { finish() }
-        bind()
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { renderState(it) }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.playVideo()
-        bind()
     }
 
     override fun onPause() {
@@ -37,13 +47,16 @@ class DetailActivity : ComponentActivity() {
         super.onPause()
     }
 
-    private fun bind() {
-        viewModel.sync()
-        val ad = viewModel.ad ?: run {
+    private fun renderState(state: DetailUiState) {
+        if (state.loading) return
+        val ad = state.ad ?: run {
             finish()
             return
         }
+        render(ad)
+    }
 
+    private fun render(ad: AdItem) {
         findViewById<TextView>(R.id.detail_channel).text = ad.channel.title
         findViewById<TextView>(R.id.detail_title).text = ad.title
         findViewById<TextView>(R.id.detail_brand).text = ad.brand
@@ -73,23 +86,18 @@ class DetailActivity : ComponentActivity() {
 
         like.setOnClickListener {
             viewModel.toggleLike()
-            bind()
         }
         favorite.setOnClickListener {
             viewModel.toggleFavorite()
-            bind()
         }
         share.setOnClickListener {
             viewModel.share()
-            bind()
         }
         video.setOnClickListener {
             viewModel.toggleVideoPlay()
-            bind()
         }
         mute.setOnClickListener {
             viewModel.toggleMute()
-            bind()
         }
     }
 

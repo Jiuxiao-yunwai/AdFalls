@@ -9,11 +9,24 @@ import com.example.adfalls.data.local.toModel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 object AdRepository {
     private const val PAGE_SIZE = 6
     private const val FIXED_AD_COUNT = 50
     private var adDao: AdDao? = null
+    private val operationMutex = Mutex()
+    private val visibleRevision = MutableStateFlow(0)
     private val visibleIds = mutableMapOf<AdChannel, MutableList<Long>>()
     private val requestedIds = mutableMapOf<AdChannel, MutableSet<Long>>()
     private val exposedIds = mutableSetOf<Long>()
@@ -28,45 +41,65 @@ object AdRepository {
 
     fun initialize(context: Context) {
         if (adDao != null) return
-        val dao = AppDatabase.getInstance(context).adDao()
-        adDao = dao
-        if (dao.countAds() != FIXED_AD_COUNT) {
-            dao.deleteAllAds()
-            dao.insertAds(fixedAds().map { it.toEntity() })
+        adDao = AppDatabase.getInstance(context).adDao()
+    }
+
+    fun observeAdsByChannel(channel: AdChannel): Flow<List<AdItem>> {
+        return flow {
+            seedIfNeeded()
+            ensureVisible(channel)
+            emitAll(
+                combine(dao().observeAdsByChannel(channel.name), visibleRevision) { entities, _ ->
+                    val visible = visibleSnapshot(channel)
+                    if (visible.isEmpty()) {
+                        emptyList()
+                    } else {
+                        val order = visible.withIndex().associate { it.value to it.index }
+                        entities
+                            .filter { it.id in order }
+                            .sortedBy { order[it.id] }
+                            .map { it.toModel() }
+                    }
+                }
+            )
+        }.flowOn(Dispatchers.IO)
+    }
+
+    fun observeAdById(id: Long): Flow<AdItem?> {
+        return flow {
+            seedIfNeeded()
+            emitAll(dao().observeAdById(id).map { it?.toModel() })
+        }.flowOn(Dispatchers.IO)
+    }
+
+    suspend fun findAd(id: Long): AdItem? = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        dao().getAdById(id)?.toModel()
+    }
+
+    suspend fun refresh(channel: AdChannel): Boolean = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        operationMutex.withLock {
+            requestNextPageLocked(channel, replaceVisible = true).also { changed ->
+                if (changed) bumpVisibleRevision()
+            }
         }
     }
 
-    fun getAds(channel: AdChannel): List<AdItem> {
-        ensureVisible(channel)
-        return getVisibleAds(channel)
-    }
-
-    fun search(channel: AdChannel, query: String): List<AdItem> {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) return getAds(channel)
-        return getAds(channel).filter { ad ->
-            ad.title.contains(trimmed, ignoreCase = true) ||
-                ad.summary.contains(trimmed, ignoreCase = true) ||
-                ad.brand.contains(trimmed, ignoreCase = true) ||
-                ad.tags.any { it.contains(trimmed, ignoreCase = true) }
+    suspend fun loadMore(channel: AdChannel): Boolean = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        operationMutex.withLock {
+            val changed = if (visibleIds[channel].isNullOrEmpty()) {
+                requestNextPageLocked(channel, replaceVisible = true)
+            } else {
+                requestNextPageLocked(channel, replaceVisible = false)
+            }
+            if (changed) bumpVisibleRevision()
+            changed
         }
     }
 
-    fun findAd(id: Long): AdItem? {
-        return dao().getAdById(id)?.toModel()
-    }
-
-    fun refresh(channel: AdChannel): List<AdItem> {
-        requestNextPage(channel, replaceVisible = true)
-        return getAds(channel)
-    }
-
-    fun loadMore(channel: AdChannel): Boolean {
-        ensureVisible(channel)
-        return requestNextPage(channel, replaceVisible = false)
-    }
-
-    fun toggleLike(id: Long) {
+    suspend fun toggleLike(id: Long) = withContext(Dispatchers.IO) {
         findAd(id)?.let { ad ->
             val liked = !ad.liked
             val likes = (ad.likes + if (liked) 1 else -1).coerceAtLeast(0)
@@ -74,28 +107,32 @@ object AdRepository {
         }
     }
 
-    fun toggleFavorite(id: Long) {
+    suspend fun toggleFavorite(id: Long) = withContext(Dispatchers.IO) {
         findAd(id)?.let { dao().updateFavorite(id, !it.favorited) }
     }
 
-    fun share(id: Long) {
+    suspend fun share(id: Long) = withContext(Dispatchers.IO) {
+        seedIfNeeded()
         dao().addShare(id)
     }
 
-    fun registerClick(id: Long) {
+    suspend fun registerClick(id: Long) = withContext(Dispatchers.IO) {
+        seedIfNeeded()
         dao().addClick(id)
     }
 
-    fun registerImpression(id: Long): Boolean {
-        return if (exposedIds.add(id)) {
-            dao().addImpression(id)
-            true
-        } else {
-            false
+    suspend fun registerImpressions(ids: List<Long>) = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        operationMutex.withLock {
+            ids.distinct().forEach { id ->
+                if (exposedIds.add(id)) {
+                    dao().addImpression(id)
+                }
+            }
         }
     }
 
-    fun setVideoState(id: Long, playing: Boolean? = null, muted: Boolean? = null) {
+    suspend fun setVideoState(id: Long, playing: Boolean? = null, muted: Boolean? = null) = withContext(Dispatchers.IO) {
         findAd(id)?.let { ad ->
             dao().updateVideoState(
                 id = id,
@@ -109,13 +146,30 @@ object AdRepository {
         return checkNotNull(adDao) { "AdRepository must be initialized from AdFallsApp before use." }
     }
 
-    private fun ensureVisible(channel: AdChannel) {
-        if (visibleIds[channel].isNullOrEmpty()) {
-            requestNextPage(channel, replaceVisible = true)
+    private suspend fun seedIfNeeded() {
+        operationMutex.withLock {
+            if (dao().countAds() != FIXED_AD_COUNT) {
+                visibleIds.clear()
+                requestedIds.clear()
+                exposedIds.clear()
+                dao().deleteAllAds()
+                dao().insertAds(fixedAds().map { it.toEntity() })
+                bumpVisibleRevision()
+            }
         }
     }
 
-    private fun requestNextPage(channel: AdChannel, replaceVisible: Boolean): Boolean {
+    private suspend fun ensureVisible(channel: AdChannel) {
+        operationMutex.withLock {
+            if (visibleIds[channel].isNullOrEmpty()) {
+                if (requestNextPageLocked(channel, replaceVisible = true)) {
+                    bumpVisibleRevision()
+                }
+            }
+        }
+    }
+
+    private suspend fun requestNextPageLocked(channel: AdChannel, replaceVisible: Boolean): Boolean {
         val requested = requestedIds.getOrPut(channel) { mutableSetOf() }
         val candidates = dao().getAdsByChannel(channel.name)
             .filterNot { it.id in requested }
@@ -129,13 +183,12 @@ object AdRepository {
         return true
     }
 
-    private fun getVisibleAds(channel: AdChannel): List<AdItem> {
-        val ids = visibleIds[channel].orEmpty()
-        if (ids.isEmpty()) return emptyList()
-        val order = ids.withIndex().associate { it.value to it.index }
-        return dao().getAdsByIds(ids)
-            .sortedBy { order[it.id] }
-            .map { it.toModel() }
+    private suspend fun visibleSnapshot(channel: AdChannel): List<Long> {
+        return operationMutex.withLock { visibleIds[channel].orEmpty().toList() }
+    }
+
+    private fun bumpVisibleRevision() {
+        visibleRevision.value = visibleRevision.value + 1
     }
 
     private fun fixedAds(): List<AdItem> {

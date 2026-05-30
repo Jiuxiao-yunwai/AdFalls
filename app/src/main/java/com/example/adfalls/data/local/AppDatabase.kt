@@ -20,7 +20,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "adfalls.db"
                 )
-                    .allowMainThreadQueries()
                     .build()
                     .also { instance = it }
             }

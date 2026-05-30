@@ -8,14 +8,19 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.ui.detail.DetailActivity
+import com.example.adfalls.viewmodel.FeedUiState
 import com.example.adfalls.viewmodel.FeedViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var tabs: List<TextView>
@@ -25,6 +30,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var adapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
     private val listStates = mutableMapOf<AdChannel, Parcelable?>()
+    private var pendingListCommitChannel: AdChannel? = null
+    private var pendingListCommit: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,14 +53,13 @@ class MainActivity : ComponentActivity() {
         adapter = AdAdapter(
             onCardClick = { ad ->
                 viewModel.registerClick(ad.id)
-                renderList()
                 startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
             },
-            onLikeClick = { ad -> viewModel.toggleLike(ad.id); renderList() },
-            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id); renderList() },
-            onShareClick = { ad -> viewModel.share(ad.id); renderList() },
-            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id); renderList() },
-            onMuteClick = { ad -> viewModel.toggleMute(ad.id); renderList() }
+            onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
+            onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
+            onShareClick = { ad -> viewModel.share(ad.id) },
+            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
+            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
         )
         recyclerView = findViewById(R.id.ad_list)
         recyclerView.layoutManager = layoutManager
@@ -61,15 +67,15 @@ class MainActivity : ComponentActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 registerVisibleImpressions()
+                val state = viewModel.uiState.value
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
-                if (!viewModel.loadingMore &&
-                    !viewModel.endReached &&
-                    viewModel.searchText.isBlank() &&
+                if (!state.loadingMore &&
+                    !state.endReached &&
+                    state.searchText.isBlank() &&
                     dy > 0 &&
                     lastVisible >= adapter.itemCount - 2
                 ) {
                     viewModel.loadMore()
-                    renderList()
                 }
             }
         })
@@ -80,7 +86,6 @@ class MainActivity : ComponentActivity() {
         swipeRefresh.setOnRefreshListener {
             viewModel.refresh()
             swipeRefresh.isRefreshing = false
-            renderList()
             recyclerView.scrollToPosition(0)
         }
 
@@ -88,37 +93,32 @@ class MainActivity : ComponentActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 viewModel.updateSearchText(s?.toString().orEmpty())
-                renderList()
             }
             override fun afterTextChanged(s: Editable?) = Unit
         })
 
-        selectTab(AdChannel.FEATURED, restorePosition = false)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::adapter.isInitialized) {
-            viewModel.sync()
-            renderList()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    updateTabs(state.activeChannel)
+                    submitAds(state)
+                }
+            }
         }
+
+        selectTab(AdChannel.FEATURED, restorePosition = false)
     }
 
     private fun selectTab(channel: AdChannel, restorePosition: Boolean = true) {
         if (::layoutManager.isInitialized) {
-            listStates[viewModel.activeChannel] = layoutManager.onSaveInstanceState()
+            listStates[viewModel.uiState.value.activeChannel] = layoutManager.onSaveInstanceState()
         }
         viewModel.selectChannel(channel)
-        tabs.forEachIndexed { index, tab ->
-            val selected = AdChannel.entries[index] == viewModel.activeChannel
-            tab.setTextColor(if (selected) Color.BLACK else Color.rgb(210, 210, 210))
-            tab.setBackgroundResource(
-                if (selected) R.drawable.bg_tab_selected else R.drawable.bg_tab_unselected
-            )
-        }
-        renderList {
+        updateTabs(channel)
+        pendingListCommitChannel = channel
+        pendingListCommit = {
             if (restorePosition) {
-                listStates[viewModel.activeChannel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
+                listStates[channel]?.let(layoutManager::onRestoreInstanceState) ?: recyclerView.scrollToPosition(0)
             } else {
                 recyclerView.scrollToPosition(0)
             }
@@ -126,9 +126,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun renderList(onCommitted: (() -> Unit)? = null) {
-        adapter.submitAds(viewModel.ads, viewModel.endReached) {
-            onCommitted?.invoke()
+    private fun updateTabs(activeChannel: AdChannel) {
+        tabs.forEachIndexed { index, tab ->
+            val selected = AdChannel.entries[index] == activeChannel
+            tab.setTextColor(if (selected) Color.BLACK else Color.rgb(210, 210, 210))
+            tab.setBackgroundResource(
+                if (selected) R.drawable.bg_tab_selected else R.drawable.bg_tab_unselected
+            )
+        }
+    }
+
+    private fun submitAds(state: FeedUiState) {
+        adapter.submitAds(state.ads, state.endReached) {
+            if (pendingListCommitChannel == null || pendingListCommitChannel == state.activeChannel) {
+                pendingListCommit?.invoke()
+                pendingListCommit = null
+                pendingListCommitChannel = null
+            }
             registerVisibleImpressions()
         }
     }
@@ -138,12 +152,12 @@ class MainActivity : ComponentActivity() {
         val first = layoutManager.findFirstVisibleItemPosition().coerceAtLeast(0)
         val last = layoutManager.findLastVisibleItemPosition().coerceAtMost(adapter.itemCount - 1)
         if (last < first) return
-        var changed = false
+        val visibleAdIds = mutableListOf<Long>()
         for (position in first..last) {
             adapter.currentList.getOrNull(position)?.let {
-                changed = viewModel.registerImpression(it.id) || changed
+                visibleAdIds.add(it.id)
             }
         }
-        if (changed) renderList()
+        viewModel.registerImpressions(visibleAdIds)
     }
 }
