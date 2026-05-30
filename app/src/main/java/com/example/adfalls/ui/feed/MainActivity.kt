@@ -194,20 +194,22 @@ class MainActivity : ComponentActivity() {
 
     private fun moveTabIndicator(activeIndex: Int) {
         if (activeIndex < 0 || tabs.isEmpty()) return
-        val tabWidth = tabs.first().width
-        if (tabWidth == 0) {
+        val activeTab = tabs[activeIndex]
+        if (activeTab.width == 0) {
             tabs.first().post { moveTabIndicator(activeIndex) }
             return
         }
 
         val layoutParams = tabIndicator.layoutParams
-        val indicatorWidth = (tabWidth - 28).coerceAtLeast(0)
+        val extraWidth = (16 * resources.displayMetrics.density).toInt()
+        val textWidth = activeTab.paint.measureText(activeTab.text.toString()).toInt()
+        val indicatorWidth = (textWidth + extraWidth).coerceAtMost(activeTab.width)
         if (layoutParams.width != indicatorWidth) {
             layoutParams.width = indicatorWidth
             tabIndicator.layoutParams = layoutParams
         }
 
-        val target = activeIndex * tabWidth.toFloat()
+        val target = activeTab.left + (activeTab.width - indicatorWidth) / 2f
         if (currentTabIndex == -1) {
             tabIndicator.translationX = target
         } else if (currentTabIndex != activeIndex) {
