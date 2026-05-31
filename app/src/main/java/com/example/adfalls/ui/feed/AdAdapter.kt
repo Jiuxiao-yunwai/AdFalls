@@ -6,10 +6,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
+import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
 
@@ -19,22 +21,23 @@ class AdAdapter(
     private val onFavoriteClick: (AdItem) -> Unit,
     private val onShareClick: (AdItem) -> Unit,
     private val onVideoClick: (AdItem) -> Unit,
-    private val onMuteClick: (AdItem) -> Unit
+    private val onMuteClick: (AdItem) -> Unit,
+    private val onTagClick: (String) -> Unit
 ) : ListAdapter<AdItem, RecyclerView.ViewHolder>(Diff) {
-    private var showEndReached = false
+    private var footerText: String? = null
 
-    fun submitAds(items: List<AdItem>, endReached: Boolean, commitCallback: (() -> Unit)? = null) {
-        showEndReached = endReached
+    fun submitAds(items: List<AdItem>, footerText: String? = null, commitCallback: (() -> Unit)? = null) {
+        this.footerText = footerText
         submitList(items) {
             notifyDataSetChanged()
             commitCallback?.invoke()
         }
     }
 
-    override fun getItemCount(): Int = super.getItemCount() + if (showEndReached) 1 else 0
+    override fun getItemCount(): Int = super.getItemCount() + if (footerText != null) 1 else 0
 
     override fun getItemViewType(position: Int): Int {
-        if (showEndReached && position == currentList.size) return R.layout.item_feed_end
+        if (footerText != null && position == currentList.size) return R.layout.item_feed_end
         return when (getItem(position).type) {
             AdCardType.LARGE_IMAGE -> R.layout.item_ad_large
             AdCardType.SMALL_IMAGE -> R.layout.item_ad_small
@@ -48,10 +51,22 @@ class AdAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        if (holder is AdViewHolder) holder.bind(getItem(position))
+        when (holder) {
+            is AdViewHolder -> holder.bind(getItem(position))
+            is EndViewHolder -> holder.bind(footerText.orEmpty())
+        }
     }
 
-    private class EndViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is AdViewHolder) holder.detachVideo()
+        super.onViewRecycled(holder)
+    }
+
+    private class EndViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        fun bind(text: String) {
+            (itemView as TextView).text = text
+        }
+    }
 
     inner class AdViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val media: View = itemView.findViewById(R.id.ad_media)
@@ -65,6 +80,7 @@ class AdAdapter(
         private val share: TextView = itemView.findViewById(R.id.action_share)
         private val video: TextView? = itemView.findViewById(R.id.action_video)
         private val mute: TextView? = itemView.findViewById(R.id.action_mute)
+        private val playerView: PlayerView? = media as? PlayerView
 
         fun bind(ad: AdItem) {
             title.text = ad.title
@@ -72,20 +88,24 @@ class AdAdapter(
             summary.text = ad.summary
             tags.text = ad.tags.joinToString("  ") { "#$it" }
             stats.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
-            like.text = if (ad.liked) "♥ ${ad.likes}" else "♡ ${ad.likes}"
-            favorite.text = if (ad.favorited) "★" else "☆"
-            share.text = "↗ ${ad.shares}"
+            like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
+            favorite.text = if (ad.favorited) "已收藏" else "收藏"
+            share.text = "分享 ${ad.shares}"
             video?.text = if (ad.playing) "暂停" else "播放"
             mute?.text = if (ad.muted) "静音" else "有声"
             video?.visibility = if (ad.playing) View.VISIBLE else View.GONE
             mute?.visibility = if (ad.playing) View.VISIBLE else View.GONE
 
             media.background = mediaBackground(ad.mediaColor, ad.type)
+            playerView?.let {
+                VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+            }
             like.isSelected = ad.liked
             favorite.isSelected = ad.favorited
             like.contentDescription = if (ad.liked) "取消点赞" else "点赞"
             favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
             share.contentDescription = "分享"
+            tags.contentDescription = "按标签筛选"
 
             itemView.setOnClickListener { onCardClick(ad) }
             media.setOnClickListener {
@@ -100,8 +120,13 @@ class AdAdapter(
             like.setOnClickListener { onLikeClick(ad) }
             favorite.setOnClickListener { onFavoriteClick(ad) }
             share.setOnClickListener { onShareClick(ad) }
+            tags.setOnClickListener { ad.tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener { onVideoClick(ad) }
             mute?.setOnClickListener { onMuteClick(ad) }
+        }
+
+        fun detachVideo() {
+            playerView?.let(VideoPlaybackPool::detach)
         }
     }
 

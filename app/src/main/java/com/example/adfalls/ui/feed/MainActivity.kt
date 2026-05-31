@@ -33,6 +33,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var outgoingLayoutManager: LinearLayoutManager
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var tagFilterBar: View
+    private lateinit var tagFilterText: TextView
+    private lateinit var emptyState: TextView
     private lateinit var adapter: AdAdapter
     private lateinit var outgoingAdapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
@@ -61,6 +64,10 @@ class MainActivity : ComponentActivity() {
         }
         tabIndicator = findViewById(R.id.tab_indicator)
         findViewById<View>(R.id.search_button).setOnClickListener { openSearchPage() }
+        tagFilterBar = findViewById(R.id.tag_filter_bar)
+        tagFilterText = findViewById(R.id.tag_filter_text)
+        emptyState = findViewById(R.id.feed_empty_state)
+        findViewById<View>(R.id.tag_filter_clear).setOnClickListener { viewModel.clearTag() }
 
         adapter = createAdapter()
         outgoingAdapter = createAdapter()
@@ -109,6 +116,7 @@ class MainActivity : ComponentActivity() {
                 if (!state.loadingMore &&
                     !state.endReached &&
                     state.searchText.isBlank() &&
+                    state.selectedTag == null &&
                     dy > 0 &&
                     lastVisible >= adapter.itemCount - 2
                 ) {
@@ -148,7 +156,8 @@ class MainActivity : ComponentActivity() {
             onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
             onShareClick = { ad -> viewModel.share(ad.id) },
             onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
-            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
+            onMuteClick = { ad -> viewModel.toggleMute(ad.id) },
+            onTagClick = { tag -> viewModel.selectTag(tag) }
         )
     }
 
@@ -185,7 +194,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun submitAds(state: FeedUiState) {
-        adapter.submitAds(state.ads, state.endReached) {
+        updateFilterAndEmptyState(state)
+        adapter.submitAds(state.ads, footerTextFor(state)) {
             if (pendingListCommitChannel == null || pendingListCommitChannel == state.activeChannel) {
                 pendingListCommit?.invoke()
                 animatePageSwitch(pendingSwitchDirection)
@@ -194,6 +204,29 @@ class MainActivity : ComponentActivity() {
                 pendingListCommitChannel = null
             }
             registerVisibleImpressions()
+        }
+    }
+
+    private fun footerTextFor(state: FeedUiState): String? {
+        return when {
+            state.loadingMore -> "加载中..."
+            state.endReached -> "到底了"
+            else -> null
+        }
+    }
+
+    private fun updateFilterAndEmptyState(state: FeedUiState) {
+        val tag = state.selectedTag
+        tagFilterBar.visibility = if (tag == null) View.GONE else View.VISIBLE
+        if (tag != null) {
+            tagFilterText.text = "正在查看 #$tag"
+        }
+        val filtering = state.searchText.isNotBlank() || tag != null
+        emptyState.visibility = if (filtering && state.ads.isEmpty()) View.VISIBLE else View.GONE
+        emptyState.text = if (tag != null) {
+            "没有找到 #$tag 相关广告"
+        } else {
+            "没有找到匹配的广告"
         }
     }
 
@@ -209,6 +242,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         viewModel.registerImpressions(visibleAdIds)
+        viewModel.pauseVideosOutside(visibleAdIds)
     }
 
     private fun moveTabIndicator(activeIndex: Int) {
@@ -251,7 +285,7 @@ class MainActivity : ComponentActivity() {
         outgoingRecyclerView.alpha = 1f
         outgoingRecyclerView.visibility = View.INVISIBLE
         outgoingSnapshotReady = false
-        outgoingAdapter.submitAds(viewModel.uiState.value.ads, viewModel.uiState.value.endReached) {
+        outgoingAdapter.submitAds(viewModel.uiState.value.ads, footerTextFor(viewModel.uiState.value)) {
             outgoingLayoutManager.onRestoreInstanceState(layoutManager.onSaveInstanceState())
             outgoingSnapshotReady = true
             outgoingRecyclerView.visibility = View.VISIBLE
@@ -282,7 +316,7 @@ class MainActivity : ComponentActivity() {
                 outgoingRecyclerView.visibility = View.GONE
                 outgoingRecyclerView.translationX = 0f
                 outgoingSnapshotReady = false
-                outgoingAdapter.submitAds(emptyList(), endReached = false)
+                outgoingAdapter.submitAds(emptyList(), footerText = null)
             }
             .start()
     }

@@ -53,10 +53,11 @@
             android:layout_height="240dp"
             android:layout_marginTop="16dp">
 
-            <View
+            <androidx.media3.ui.PlayerView
                 android:id="@+id/detail_media"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" />
+                android:layout_height="match_parent"
+                android:background="#222222" />
 
             <TextView
                 android:id="@+id/detail_video"

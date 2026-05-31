@@ -28,6 +28,7 @@ class SearchActivity : ComponentActivity() {
     private lateinit var viewModel: FeedViewModel
     private lateinit var adapter: AdAdapter
     private lateinit var input: EditText
+    private lateinit var emptyState: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,8 +43,10 @@ class SearchActivity : ComponentActivity() {
         viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
         viewModel.selectChannel(channel)
 
+        input = findViewById(R.id.search_input)
+        emptyState = findViewById(R.id.search_empty_state)
         findViewById<TextView>(R.id.search_back).setOnClickListener { finish() }
-        findViewById<TextView>(R.id.search_scope).text = "当前频道：${channel.title}"
+        findViewById<TextView>(R.id.search_scope).text = "当前频道：${channel.title} · 可搜索标题、品牌、摘要和标签"
 
         adapter = AdAdapter(
             onCardClick = { ad ->
@@ -54,7 +57,11 @@ class SearchActivity : ComponentActivity() {
             onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
             onShareClick = { ad -> viewModel.share(ad.id) },
             onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
-            onMuteClick = { ad -> viewModel.toggleMute(ad.id) }
+            onMuteClick = { ad -> viewModel.toggleMute(ad.id) },
+            onTagClick = { tag ->
+                input.setText(tag)
+                input.setSelection(input.text.length)
+            }
         )
 
         findViewById<RecyclerView>(R.id.search_results).apply {
@@ -62,7 +69,6 @@ class SearchActivity : ComponentActivity() {
             adapter = this@SearchActivity.adapter
         }
 
-        input = findViewById(R.id.search_input)
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -74,7 +80,17 @@ class SearchActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
-                    adapter.submitAds(state.ads, endReached = false)
+                    adapter.submitAds(state.ads)
+                    emptyState.visibility = when {
+                        state.searchText.isBlank() -> View.VISIBLE
+                        state.ads.isEmpty() -> View.VISIBLE
+                        else -> View.GONE
+                    }
+                    emptyState.text = if (state.searchText.isBlank()) {
+                        "输入关键词，搜索标题、品牌、摘要或标签"
+                    } else {
+                        "没有找到“${state.searchText}”相关广告"
+                    }
                 }
             }
         }
