@@ -75,6 +75,7 @@ class AdAdapter(
     }
 
     inner class AdViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val mediaContainer: View? = itemView.findViewById(R.id.ad_media_container)
         private val media: View = itemView.findViewById(R.id.ad_media)
         private val title: TextView = itemView.findViewById(R.id.ad_title)
         private val brand: TextView = itemView.findViewById(R.id.ad_brand)
@@ -114,6 +115,7 @@ class AdAdapter(
             progressPanel?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
             if (ad.type == AdCardType.VIDEO) startProgressUpdates(ad.id)
 
+            resizeMedia(ad.type)
             media.background = mediaBackground(ad.mediaColor, ad.type)
             playerView?.useController = false
             playerView?.let {
@@ -174,6 +176,21 @@ class AdAdapter(
             }
             time?.text = "${formatTime(position)} / ${formatTime(duration)}"
         }
+
+        private fun resizeMedia(type: AdCardType) {
+            val target = mediaContainer ?: media
+            target.post {
+                val width = target.width.takeIf { it > 0 } ?: return@post
+                val targetHeight = when (type) {
+                    AdCardType.LARGE_IMAGE,
+                    AdCardType.VIDEO -> (width * MEDIA_RATIO_9_16).toInt()
+                    AdCardType.SMALL_IMAGE -> width
+                }
+                if (target.layoutParams.height != targetHeight) {
+                    target.layoutParams = target.layoutParams.apply { height = targetHeight }
+                }
+            }
+        }
     }
 
     private fun mediaBackground(color: Int, type: AdCardType): GradientDrawable {
@@ -202,6 +219,7 @@ class AdAdapter(
     private companion object {
         private const val VIDEO_PROGRESS_INTERVAL_MS = 500L
         private const val VIDEO_PROGRESS_MAX = 1000L
+        private const val MEDIA_RATIO_9_16 = 9f / 16f
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)

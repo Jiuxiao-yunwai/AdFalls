@@ -82,6 +82,7 @@ class DetailActivity : ComponentActivity() {
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(ad.mediaColor, darken(ad.mediaColor))
         ).apply { cornerRadius = 22f }
+        resizeMedia(ad.type)
         playerView.useController = false
         if (ad.type == AdCardType.VIDEO) {
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
@@ -143,6 +144,21 @@ class DetailActivity : ComponentActivity() {
         time.text = "${formatTime(position)} / ${formatTime(duration)}"
     }
 
+    private fun resizeMedia(type: AdCardType) {
+        val container = findViewById<View>(R.id.detail_media_container)
+        container.post {
+            val width = container.width.takeIf { it > 0 } ?: return@post
+            val targetHeight = when (type) {
+                AdCardType.VIDEO,
+                AdCardType.LARGE_IMAGE -> (width * MEDIA_RATIO_9_16).toInt()
+                AdCardType.SMALL_IMAGE -> width
+            }
+            if (container.layoutParams.height != targetHeight) {
+                container.layoutParams = container.layoutParams.apply { height = targetHeight }
+            }
+        }
+    }
+
     private fun darken(color: Int): Int {
         return Color.rgb(
             (Color.red(color) * 0.68f).toInt(),
@@ -155,6 +171,7 @@ class DetailActivity : ComponentActivity() {
         const val EXTRA_AD_ID = "extra_ad_id"
         private const val VIDEO_PROGRESS_INTERVAL_MS = 500L
         private const val VIDEO_PROGRESS_MAX = 1000L
+        private const val MEDIA_RATIO_9_16 = 9f / 16f
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = milliseconds.coerceAtLeast(0L) / 1000L

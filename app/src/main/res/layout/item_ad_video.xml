@@ -9,6 +9,7 @@
     android:padding="12dp">
 
     <FrameLayout
+        android:id="@+id/ad_media_container"
         android:layout_width="match_parent"
         android:layout_height="190dp">
 
@@ -17,6 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#222222"
+            app:resize_mode="zoom"
             app:use_controller="false" />
 
         <ImageButton
