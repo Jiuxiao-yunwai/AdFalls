@@ -28,6 +28,8 @@ class DetailActivity : ComponentActivity() {
     private lateinit var playerView: PlayerView
     private val progressHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
+    private val controlsHandler = Handler(Looper.getMainLooper())
+    private var hideControlsRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +56,7 @@ class DetailActivity : ComponentActivity() {
 
     override fun onPause() {
         stopProgressUpdates()
+        stopPendingControlHide()
         viewModel.pauseVideo()
         VideoPlaybackPool.detach(playerView)
         super.onPause()
@@ -87,8 +90,14 @@ class DetailActivity : ComponentActivity() {
         if (ad.type == AdCardType.VIDEO) {
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
             startProgressUpdates(ad.id)
+            if (ad.playing) {
+                hideControls(animate = false)
+            } else {
+                showControls(scheduleHide = true)
+            }
         } else {
             stopProgressUpdates()
+            hideControls(animate = false)
             VideoPlaybackPool.detach(playerView)
         }
 
@@ -106,15 +115,29 @@ class DetailActivity : ComponentActivity() {
         mute.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
         video.contentDescription = if (ad.playing) "暂停" else "播放"
         mute.contentDescription = if (ad.muted) "取消静音" else "静音"
-        video.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
-        mute.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
-        progressPanel.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+        if (ad.type != AdCardType.VIDEO) {
+            video.visibility = View.GONE
+            mute.visibility = View.GONE
+            progressPanel.visibility = View.GONE
+        }
 
         like.setOnClickListener { viewModel.toggleLike() }
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
-        video.setOnClickListener { viewModel.toggleVideoPlay() }
-        mute.setOnClickListener { viewModel.toggleMute() }
+        playerView.setOnClickListener {
+            if (ad.type == AdCardType.VIDEO) {
+                showControls(scheduleHide = true)
+                viewModel.toggleVideoPlay()
+            }
+        }
+        video.setOnClickListener {
+            showControls(scheduleHide = true)
+            viewModel.toggleVideoPlay()
+        }
+        mute.setOnClickListener {
+            showControls(scheduleHide = true)
+            viewModel.toggleMute()
+        }
     }
 
     private fun startProgressUpdates(adId: Long) {
@@ -130,6 +153,49 @@ class DetailActivity : ComponentActivity() {
     private fun stopProgressUpdates() {
         progressRunnable?.let(progressHandler::removeCallbacks)
         progressRunnable = null
+    }
+
+    private fun showControls(scheduleHide: Boolean) {
+        stopPendingControlHide()
+        controlViews().forEach { control ->
+            control.animate().cancel()
+            control.alpha = 1f
+            control.visibility = View.VISIBLE
+        }
+        if (scheduleHide) {
+            hideControlsRunnable = Runnable { hideControls(animate = true) }
+            controlsHandler.postDelayed(hideControlsRunnable!!, CONTROLS_AUTO_HIDE_MS)
+        }
+    }
+
+    private fun hideControls(animate: Boolean) {
+        stopPendingControlHide()
+        controlViews().forEach { control ->
+            control.animate().cancel()
+            if (animate && control.visibility == View.VISIBLE) {
+                control.animate()
+                    .alpha(0f)
+                    .setDuration(CONTROLS_FADE_DURATION_MS)
+                    .withEndAction { control.visibility = View.GONE }
+                    .start()
+            } else {
+                control.alpha = 0f
+                control.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun stopPendingControlHide() {
+        hideControlsRunnable?.let(controlsHandler::removeCallbacks)
+        hideControlsRunnable = null
+    }
+
+    private fun controlViews(): List<View> {
+        return listOf(
+            findViewById(R.id.detail_video),
+            findViewById(R.id.detail_mute),
+            findViewById(R.id.detail_progress_panel)
+        )
     }
 
     private fun updateProgress(adId: Long) {
@@ -172,6 +238,8 @@ class DetailActivity : ComponentActivity() {
         private const val VIDEO_PROGRESS_INTERVAL_MS = 33L
         private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f
+        private const val CONTROLS_AUTO_HIDE_MS = 2_000L
+        private const val CONTROLS_FADE_DURATION_MS = 220L
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = milliseconds.coerceAtLeast(0L) / 1000L
