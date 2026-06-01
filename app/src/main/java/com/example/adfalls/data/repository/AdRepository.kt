@@ -25,8 +25,11 @@ object AdRepository {
     private const val PAGE_SIZE = 6
     private const val FIXED_AD_COUNT = 50
     private const val OLD_SAMPLE_VIDEO_URL = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
-    private const val SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    private const val REMOTE_SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    private const val LOCAL_VIDEO_URL_PREFIX = "file:"
     private var adDao: AdDao? = null
+    private var appContext: Context? = null
+    private var sampleVideoUrls: List<String> = emptyList()
     private val operationMutex = Mutex()
     private val visibleRevision = MutableStateFlow(0)
     private val visibleIds = mutableMapOf<AdChannel, MutableList<Long>>()
@@ -43,6 +46,7 @@ object AdRepository {
 
     fun initialize(context: Context) {
         if (adDao != null) return
+        appContext = context.applicationContext
         adDao = AppDatabase.getInstance(context).adDao()
     }
 
@@ -150,7 +154,13 @@ object AdRepository {
 
     private suspend fun seedIfNeeded() {
         operationMutex.withLock {
-            if (dao().countAds() != FIXED_AD_COUNT || dao().countAdsByVideoUrl(OLD_SAMPLE_VIDEO_URL) > 0) {
+            sampleVideoUrls = MockVideoGenerator.ensureVideos(checkNotNull(appContext))
+            if (
+                dao().countAds() != FIXED_AD_COUNT ||
+                dao().countAdsByVideoUrl(OLD_SAMPLE_VIDEO_URL) > 0 ||
+                dao().countAdsByVideoUrl(REMOTE_SAMPLE_VIDEO_URL) > 0 ||
+                dao().countVideoAdsNotStartingWith(LOCAL_VIDEO_URL_PREFIX) > 0
+            ) {
                 visibleIds.clear()
                 requestedIds.clear()
                 exposedIds.clear()
@@ -271,7 +281,7 @@ object AdRepository {
             type = type,
             title = title,
             brand = brand,
-            videoUrl = if (type == AdCardType.VIDEO) SAMPLE_VIDEO_URL else null,
+            videoUrl = if (type == AdCardType.VIDEO) sampleVideoUrl(id) else null,
             summary = "AI 摘要：$brand 适合关注${tags.joinToString("、")}的用户，卖点清晰，适合信息流快速决策。",
             detail = "详情页展示更完整的图文/视频广告内容，并与信息流共享点赞、收藏、分享、点击和曝光状态。",
             tags = tags,
@@ -287,4 +297,9 @@ object AdRepository {
         val brand: String,
         val tags: List<String>
     )
+
+    private fun sampleVideoUrl(id: Long): String {
+        val urls = sampleVideoUrls
+        return urls[((id - 1) % urls.size).toInt()]
+    }
 }

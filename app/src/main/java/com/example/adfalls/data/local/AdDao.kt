@@ -50,6 +50,9 @@ interface AdDao {
     @Query("SELECT COUNT(*) FROM ads WHERE videoUrl = :videoUrl")
     suspend fun countAdsByVideoUrl(videoUrl: String): Int
 
+    @Query("SELECT COUNT(*) FROM ads WHERE videoUrl IS NOT NULL AND videoUrl NOT LIKE :prefix || '%'")
+    suspend fun countVideoAdsNotStartingWith(prefix: String): Int
+
     @Query("SELECT MAX(id) FROM ads")
     suspend fun maxAdId(): Long?
 
