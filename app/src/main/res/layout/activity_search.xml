@@ -52,12 +52,26 @@
         android:textColor="#9A9A9A"
         android:textSize="12sp" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/search_results"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="14dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="22dp" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_results"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="22dp" />
+
+        <TextView
+            android:id="@+id/search_empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="输入关键词，搜索标题、品牌、摘要或标签"
+            android:textColor="#8C8C8C"
+            android:textSize="14sp" />
+    </FrameLayout>
 </LinearLayout>

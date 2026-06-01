@@ -81,6 +81,41 @@
             android:tint="#FFFFFF" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/tag_filter_bar"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tag_filter_text"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_action_button"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="#222222"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tag_filter_clear"
+            android:layout_width="64dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_dark_button"
+            android:gravity="center"
+            android:text="清除"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
@@ -105,6 +140,16 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingBottom="22dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/feed_empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="没有找到匹配的广告"
+                android:textColor="#8C8C8C"
+                android:textSize="14sp"
                 android:visibility="gone" />
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

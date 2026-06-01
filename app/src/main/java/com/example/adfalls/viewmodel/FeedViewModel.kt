@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 data class FeedUiState(
     val activeChannel: AdChannel = AdChannel.FEATURED,
     val searchText: String = "",
+    val selectedTag: String? = null,
     val ads: List<AdItem> = emptyList(),
     val loadingMore: Boolean = false,
     val endReached: Boolean = false
@@ -28,6 +29,7 @@ data class FeedUiState(
 class FeedViewModel : ViewModel() {
     private val activeChannel = MutableStateFlow(AdChannel.FEATURED)
     private val searchText = MutableStateFlow("")
+    private val selectedTag = MutableStateFlow<String?>(null)
     private val loadingMore = MutableStateFlow(false)
     private val endReached = MutableStateFlow(false)
 
@@ -37,17 +39,19 @@ class FeedViewModel : ViewModel() {
 
     val uiState: StateFlow<FeedUiState> = combine(
         searchText,
+        selectedTag,
         channelAds,
         loadingMore,
         endReached
-    ) { query, channelAndAds, loading, reached ->
+    ) { query, tag, channelAndAds, loading, reached ->
         val (channel, ads) = channelAndAds
         FeedUiState(
             activeChannel = channel,
             searchText = query,
-            ads = filterAds(ads, query),
+            selectedTag = tag,
+            ads = filterAds(ads, query, tag),
             loadingMore = loading,
-            endReached = query.isBlank() && reached
+            endReached = query.isBlank() && tag == null && reached
         )
     }.stateIn(
         scope = viewModelScope,
@@ -65,6 +69,16 @@ class FeedViewModel : ViewModel() {
         endReached.value = false
     }
 
+    fun selectTag(tag: String) {
+        selectedTag.value = tag
+        endReached.value = false
+    }
+
+    fun clearTag() {
+        selectedTag.value = null
+        endReached.value = false
+    }
+
     fun refresh() {
         viewModelScope.launch {
             AdRepository.refresh(activeChannel.value)
@@ -74,7 +88,7 @@ class FeedViewModel : ViewModel() {
 
     fun loadMore() {
         val state = uiState.value
-        if (state.loadingMore || state.searchText.isNotBlank()) return
+        if (state.loadingMore || state.searchText.isNotBlank() || state.selectedTag != null) return
 
         viewModelScope.launch {
             loadingMore.value = true
@@ -93,6 +107,15 @@ class FeedViewModel : ViewModel() {
     fun registerImpressions(adIds: List<Long>) {
         if (adIds.isEmpty()) return
         viewModelScope.launch { AdRepository.registerImpressions(adIds) }
+    }
+
+    fun pauseVideosOutside(visibleAdIds: List<Long>) {
+        val visible = visibleAdIds.toSet()
+        uiState.value.ads
+            .filter { it.playing && it.id !in visible }
+            .forEach { ad ->
+                viewModelScope.launch { VideoPlaybackPool.pause(ad.id) }
+            }
     }
 
     fun toggleLike(adId: Long) {
@@ -115,14 +138,16 @@ class FeedViewModel : ViewModel() {
         viewModelScope.launch { VideoPlaybackPool.toggleMute(adId) }
     }
 
-    private fun filterAds(ads: List<AdItem>, query: String): List<AdItem> {
+    private fun filterAds(ads: List<AdItem>, query: String, selectedTag: String?): List<AdItem> {
         val trimmed = query.trim()
-        if (trimmed.isEmpty()) return ads
         return ads.filter { ad ->
-            ad.title.contains(trimmed, ignoreCase = true) ||
+            val matchesQuery = trimmed.isEmpty() ||
+                ad.title.contains(trimmed, ignoreCase = true) ||
                 ad.summary.contains(trimmed, ignoreCase = true) ||
                 ad.brand.contains(trimmed, ignoreCase = true) ||
                 ad.tags.any { it.contains(trimmed, ignoreCase = true) }
+            val matchesTag = selectedTag == null || ad.tags.any { it.equals(selectedTag, ignoreCase = true) }
+            matchesQuery && matchesTag
         }
     }
 }

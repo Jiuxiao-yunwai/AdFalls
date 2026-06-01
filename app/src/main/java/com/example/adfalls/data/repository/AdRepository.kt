@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 object AdRepository {
     private const val PAGE_SIZE = 6
     private const val FIXED_AD_COUNT = 50
+    private const val SAMPLE_VIDEO_URL = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
     private var adDao: AdDao? = null
     private val operationMutex = Mutex()
     private val visibleRevision = MutableStateFlow(0)
@@ -269,7 +270,8 @@ object AdRepository {
             type = type,
             title = title,
             brand = brand,
-            summary = "AI 摘要：${brand}适合关注${tags.joinToString("、")}的用户，卖点清晰，适合信息流快速决策。",
+            videoUrl = if (type == AdCardType.VIDEO) SAMPLE_VIDEO_URL else null,
+            summary = "AI 摘要：$brand 适合关注${tags.joinToString("、")}的用户，卖点清晰，适合信息流快速决策。",
             detail = "详情页展示更完整的图文/视频广告内容，并与信息流共享点赞、收藏、分享、点击和曝光状态。",
             tags = tags,
             mediaColor = palette[((id - 1) + channel.ordinal).toInt() % palette.size],
@@ -284,5 +286,4 @@ object AdRepository {
         val brand: String,
         val tags: List<String>
     )
-
 }
