@@ -160,25 +160,26 @@ class AdAdapter(
             share.contentDescription = "分享"
             tags.contentDescription = "按标签筛选"
 
-            itemView.setOnClickListener { onCardClick(ad) }
+            itemView.setOnClickListener { onCardClick(boundAd ?: ad) }
             media.setOnClickListener {
-                if (ad.type == AdCardType.VIDEO) {
-                    toggleVideoFromUser(ad)
+                val currentAd = boundAd ?: ad
+                if (currentAd.type == AdCardType.VIDEO) {
+                    toggleVideoFromUser(currentAd)
                 } else {
-                    onCardClick(ad)
+                    onCardClick(currentAd)
                 }
             }
-            like.setOnClickListener { onLikeClick(ad) }
-            favorite.setOnClickListener { onFavoriteClick(ad) }
-            share.setOnClickListener { onShareClick(ad) }
-            tags.setOnClickListener { ad.tags.firstOrNull()?.let(onTagClick) }
+            like.setOnClickListener { onLikeClick(boundAd ?: ad) }
+            favorite.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
+            share.setOnClickListener { onShareClick(boundAd ?: ad) }
+            tags.setOnClickListener { (boundAd ?: ad).tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener {
-                toggleVideoFromUser(ad)
+                toggleVideoFromUser(boundAd ?: ad)
             }
             mute?.setOnClickListener {
                 keepControlsVisibleOnNextBind = true
                 showPlaybackControls(scheduleHide = true)
-                onMuteClick(ad)
+                onMuteClick(boundAd ?: ad)
             }
         }
 

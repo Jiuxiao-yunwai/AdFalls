@@ -146,12 +146,13 @@ class DetailActivity : ComponentActivity() {
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
         playerView.setOnClickListener {
-            if (ad.type == AdCardType.VIDEO) {
-                toggleVideoFromUser(ad)
+            val currentAd = lastRenderedAd ?: ad
+            if (currentAd.type == AdCardType.VIDEO) {
+                toggleVideoFromUser(currentAd)
             }
         }
         video.setOnClickListener {
-            toggleVideoFromUser(ad)
+            toggleVideoFromUser(lastRenderedAd ?: ad)
         }
         mute.setOnClickListener {
             keepControlsVisibleOnNextRender = true
