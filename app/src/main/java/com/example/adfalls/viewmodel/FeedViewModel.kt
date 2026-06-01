@@ -60,6 +60,7 @@ class FeedViewModel : ViewModel() {
     )
 
     fun selectChannel(channel: AdChannel) {
+        pauseCurrentVideos()
         activeChannel.value = channel
         endReached.value = false
     }
@@ -113,6 +114,14 @@ class FeedViewModel : ViewModel() {
         val visible = visibleAdIds.toSet()
         uiState.value.ads
             .filter { it.playing && it.id !in visible }
+            .forEach { ad ->
+                viewModelScope.launch { VideoPlaybackPool.pause(ad.id) }
+            }
+    }
+
+    private fun pauseCurrentVideos() {
+        uiState.value.ads
+            .filter { it.playing }
             .forEach { ad ->
                 viewModelScope.launch { VideoPlaybackPool.pause(ad.id) }
             }
