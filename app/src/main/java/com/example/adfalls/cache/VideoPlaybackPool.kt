@@ -2,6 +2,7 @@ package com.example.adfalls.cache
 
 import android.content.Context
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -16,6 +17,7 @@ object VideoPlaybackPool {
     private var activeVideoUrl: String? = null
     private var attachedView: PlayerView? = null
     private val playbackPositions = mutableMapOf<Long, Long>()
+    private val playbackDurations = mutableMapOf<Long, Long>()
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -43,6 +45,14 @@ object VideoPlaybackPool {
         }
     }
 
+    fun progress(id: Long): Pair<Long, Long> {
+        val currentPlayer = player
+        if (activeVideoId == id && currentPlayer != null) {
+            saveActiveProgress()
+        }
+        return (playbackPositions[id] ?: 0L) to (playbackDurations[id] ?: 0L)
+    }
+
     suspend fun togglePlay(id: Long) {
         val ad = AdRepository.findAd(id) ?: return
         if (ad.playing) {
@@ -63,7 +73,7 @@ object VideoPlaybackPool {
         withContext(Dispatchers.Main) {
             val player = requirePlayer()
             if (activeVideoId != id || activeVideoUrl != videoUrl) {
-                saveActivePosition()
+                saveActiveProgress()
                 player.setMediaItem(MediaItem.fromUri(videoUrl))
                 player.prepare()
                 player.seekTo(playbackPositions[id] ?: 0L)
@@ -89,7 +99,7 @@ object VideoPlaybackPool {
             val switchingVideo = activeVideoId != id || activeVideoUrl != videoUrl
             if (switchingVideo) {
                 previousVideoId = activeVideoId
-                saveActivePosition()
+                saveActiveProgress()
                 player.setMediaItem(MediaItem.fromUri(videoUrl))
                 player.prepare()
                 player.seekTo(playbackPositions[id] ?: 0L)
@@ -113,7 +123,7 @@ object VideoPlaybackPool {
     suspend fun pause(id: Long) {
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
-                saveActivePosition()
+                saveActiveProgress()
                 requirePlayer().pause()
                 activeVideoId = null
                 activeVideoUrl = null
@@ -125,7 +135,7 @@ object VideoPlaybackPool {
     suspend fun pauseFromFeed(id: Long) {
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
-                saveActivePosition()
+                saveActiveProgress()
                 player?.pause()
                 attachedView?.player = null
                 attachedView = null
@@ -154,14 +164,19 @@ object VideoPlaybackPool {
         activeVideoId = null
         activeVideoUrl = null
         playbackPositions.clear()
+        playbackDurations.clear()
         player?.release()
         player = null
     }
 
-    private fun saveActivePosition() {
+    private fun saveActiveProgress() {
         val id = activeVideoId ?: return
         val currentPlayer = player ?: return
         playbackPositions[id] = currentPlayer.currentPosition
+        val duration = currentPlayer.duration
+        if (duration != C.TIME_UNSET && duration > 0L) {
+            playbackDurations[id] = duration
+        }
     }
 
     private fun requirePlayer(): ExoPlayer {

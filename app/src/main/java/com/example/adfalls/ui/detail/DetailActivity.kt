@@ -3,7 +3,10 @@ package com.example.adfalls.ui.detail
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
@@ -22,6 +25,8 @@ import kotlinx.coroutines.launch
 class DetailActivity : ComponentActivity() {
     private lateinit var viewModel: DetailViewModel
     private lateinit var playerView: PlayerView
+    private val progressHandler = Handler(Looper.getMainLooper())
+    private var progressRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +52,7 @@ class DetailActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        stopProgressUpdates()
         viewModel.pauseVideo()
         VideoPlaybackPool.detach(playerView)
         super.onPause()
@@ -75,9 +81,12 @@ class DetailActivity : ComponentActivity() {
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(ad.mediaColor, darken(ad.mediaColor))
         ).apply { cornerRadius = 22f }
+        playerView.useController = false
         if (ad.type == AdCardType.VIDEO) {
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
+            startProgressUpdates(ad.id)
         } else {
+            stopProgressUpdates()
             VideoPlaybackPool.detach(playerView)
         }
 
@@ -86,20 +95,49 @@ class DetailActivity : ComponentActivity() {
         val share = findViewById<TextView>(R.id.detail_share)
         val video = findViewById<TextView>(R.id.detail_video)
         val mute = findViewById<TextView>(R.id.detail_mute)
+        val progressPanel = findViewById<View>(R.id.detail_progress_panel)
 
         like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
         favorite.text = if (ad.favorited) "已收藏" else "收藏"
         share.text = "分享"
-        video.text = if (ad.playing) "暂停视频" else "播放视频"
+        video.text = if (ad.playing) "暂停" else "播放"
         mute.text = if (ad.muted) "静音" else "有声"
         video.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
         mute.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+        progressPanel.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
 
         like.setOnClickListener { viewModel.toggleLike() }
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
         video.setOnClickListener { viewModel.toggleVideoPlay() }
         mute.setOnClickListener { viewModel.toggleMute() }
+    }
+
+    private fun startProgressUpdates(adId: Long) {
+        stopProgressUpdates()
+        progressRunnable = object : Runnable {
+            override fun run() {
+                updateProgress(adId)
+                progressHandler.postDelayed(this, VIDEO_PROGRESS_INTERVAL_MS)
+            }
+        }.also { it.run() }
+    }
+
+    private fun stopProgressUpdates() {
+        progressRunnable?.let(progressHandler::removeCallbacks)
+        progressRunnable = null
+    }
+
+    private fun updateProgress(adId: Long) {
+        val progress = findViewById<ProgressBar>(R.id.detail_progress)
+        val time = findViewById<TextView>(R.id.detail_time)
+        val (position, duration) = VideoPlaybackPool.progress(adId)
+        progress.progress = if (duration > 0L) {
+            ((position.coerceAtMost(duration) * VIDEO_PROGRESS_MAX) / duration).toInt()
+        } else {
+            0
+        }
+        time.text = "${formatTime(position)} / ${formatTime(duration)}"
     }
 
     private fun darken(color: Int): Int {
@@ -112,5 +150,14 @@ class DetailActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_AD_ID = "extra_ad_id"
+        private const val VIDEO_PROGRESS_INTERVAL_MS = 500L
+        private const val VIDEO_PROGRESS_MAX = 1000L
+
+        private fun formatTime(milliseconds: Long): String {
+            val totalSeconds = milliseconds.coerceAtLeast(0L) / 1000L
+            val minutes = totalSeconds / 60L
+            val seconds = totalSeconds % 60L
+            return "$minutes:${seconds.toString().padStart(2, '0')}"
+        }
     }
 }

@@ -150,6 +150,18 @@ class MainActivity : ComponentActivity() {
         selectTab(AdChannel.FEATURED, restorePosition = false)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::recyclerView.isInitialized) {
+            recyclerView.post { scheduleFeedVideoAutoplay() }
+        }
+    }
+
+    override fun onPause() {
+        pauseScheduledFeedVideo()
+        super.onPause()
+    }
+
     private fun createAdapter(): AdAdapter {
         return AdAdapter(
             onCardClick = { ad ->
@@ -268,6 +280,11 @@ class MainActivity : ComponentActivity() {
             viewModel.pauseVideoIfGone(playingId)
             scheduledFeedVideoId = null
         }
+    }
+
+    private fun pauseScheduledFeedVideo() {
+        scheduledFeedVideoId?.let(viewModel::pauseVideoIfGone)
+        scheduledFeedVideoId = null
     }
 
     private fun findFirstFullyVisibleVideo(): Pair<AdItem, AdAdapter.AdViewHolder>? {

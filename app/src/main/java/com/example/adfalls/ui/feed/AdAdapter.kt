@@ -2,9 +2,12 @@ package com.example.adfalls.ui.feed
 
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.DiffUtil
@@ -82,10 +85,16 @@ class AdAdapter(
         private val share: TextView = itemView.findViewById(R.id.action_share)
         private val video: TextView? = itemView.findViewById(R.id.action_video)
         private val mute: TextView? = itemView.findViewById(R.id.action_mute)
+        private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
+        private val progress: ProgressBar? = itemView.findViewById(R.id.video_progress)
+        private val time: TextView? = itemView.findViewById(R.id.video_time)
         private val playerView: PlayerView? = media as? PlayerView
         private var boundAd: AdItem? = null
+        private val progressHandler = Handler(Looper.getMainLooper())
+        private var progressRunnable: Runnable? = null
 
         fun bind(ad: AdItem) {
+            stopProgressUpdates()
             boundAd = ad
             title.text = ad.title
             brand.text = ad.brand
@@ -97,10 +106,13 @@ class AdAdapter(
             share.text = "分享 ${ad.shares}"
             video?.text = if (ad.playing) "暂停" else "播放"
             mute?.text = if (ad.muted) "静音" else "有声"
-            video?.visibility = if (ad.playing) View.VISIBLE else View.GONE
-            mute?.visibility = if (ad.playing) View.VISIBLE else View.GONE
+            video?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+            mute?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+            progressPanel?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+            if (ad.type == AdCardType.VIDEO) startProgressUpdates(ad.id)
 
             media.background = mediaBackground(ad.mediaColor, ad.type)
+            playerView?.useController = false
             playerView?.let {
                 VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
             }
@@ -114,9 +126,7 @@ class AdAdapter(
             itemView.setOnClickListener { onCardClick(ad) }
             media.setOnClickListener {
                 if (ad.type == AdCardType.VIDEO) {
-                    val showControls = video?.visibility != View.VISIBLE
-                    video?.visibility = if (showControls) View.VISIBLE else View.GONE
-                    mute?.visibility = if (showControls) View.VISIBLE else View.GONE
+                    onVideoClick(ad)
                 } else {
                     onCardClick(ad)
                 }
@@ -130,12 +140,37 @@ class AdAdapter(
         }
 
         fun detachVideo() {
+            stopProgressUpdates()
             playerView?.let(VideoPlaybackPool::detach)
         }
 
         fun getPlayerView(): PlayerView? = playerView
 
         fun getBoundAd(): AdItem? = boundAd
+
+        private fun startProgressUpdates(adId: Long) {
+            progressRunnable = object : Runnable {
+                override fun run() {
+                    updateProgress(adId)
+                    progressHandler.postDelayed(this, VIDEO_PROGRESS_INTERVAL_MS)
+                }
+            }.also { it.run() }
+        }
+
+        private fun stopProgressUpdates() {
+            progressRunnable?.let(progressHandler::removeCallbacks)
+            progressRunnable = null
+        }
+
+        private fun updateProgress(adId: Long) {
+            val (position, duration) = VideoPlaybackPool.progress(adId)
+            progress?.progress = if (duration > 0L) {
+                ((position.coerceAtMost(duration) * VIDEO_PROGRESS_MAX) / duration).toInt()
+            } else {
+                0
+            }
+            time?.text = "${formatTime(position)} / ${formatTime(duration)}"
+        }
     }
 
     private fun mediaBackground(color: Int, type: AdCardType): GradientDrawable {
@@ -159,5 +194,17 @@ class AdAdapter(
     private object Diff : DiffUtil.ItemCallback<AdItem>() {
         override fun areItemsTheSame(oldItem: AdItem, newItem: AdItem): Boolean = oldItem.id == newItem.id
         override fun areContentsTheSame(oldItem: AdItem, newItem: AdItem): Boolean = oldItem == newItem
+    }
+
+    private companion object {
+        private const val VIDEO_PROGRESS_INTERVAL_MS = 500L
+        private const val VIDEO_PROGRESS_MAX = 1000L
+
+        private fun formatTime(milliseconds: Long): String {
+            val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)
+            val minutes = totalSeconds / 60L
+            val seconds = totalSeconds % 60L
+            return "$minutes:${seconds.toString().padStart(2, '0')}"
+        }
     }
 }
