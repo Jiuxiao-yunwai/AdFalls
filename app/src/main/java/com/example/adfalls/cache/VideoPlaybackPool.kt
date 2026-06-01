@@ -20,6 +20,7 @@ object VideoPlaybackPool {
         appContext = context.applicationContext
     }
 
+    // Reuses one shared ExoPlayer so only one video is active at a time.
     fun attach(playerView: PlayerView, id: Long, videoUrl: String?, playing: Boolean, muted: Boolean) {
         if (!playing || videoUrl.isNullOrBlank() || activeVideoId != id) {
             if (attachedView == playerView) playerView.player = null
@@ -33,6 +34,7 @@ object VideoPlaybackPool {
         }
     }
 
+    // Only detaches the PlayerView currently owned by the pool.
     fun detach(playerView: PlayerView) {
         if (attachedView == playerView) {
             playerView.player = null
@@ -54,6 +56,7 @@ object VideoPlaybackPool {
         play(id, ad.videoUrl, ad.muted)
     }
 
+    // Play state is written through AdRepository so Room keeps list and detail in sync.
     suspend fun play(id: Long, videoUrl: String?, muted: Boolean) {
         if (videoUrl.isNullOrBlank()) return
         withContext(Dispatchers.Main) {
@@ -94,6 +97,17 @@ object VideoPlaybackPool {
             }
         }
         AdRepository.setVideoState(id, muted = muted)
+    }
+
+    // Call from a host's final teardown path when the shared player is no longer needed.
+    fun release() {
+        player?.pause()
+        attachedView?.player = null
+        attachedView = null
+        activeVideoId = null
+        activeVideoUrl = null
+        player?.release()
+        player = null
     }
 
     private fun requirePlayer(): ExoPlayer {
