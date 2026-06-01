@@ -169,8 +169,8 @@ class DetailActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_AD_ID = "extra_ad_id"
-        private const val VIDEO_PROGRESS_INTERVAL_MS = 500L
-        private const val VIDEO_PROGRESS_MAX = 1000L
+        private const val VIDEO_PROGRESS_INTERVAL_MS = 33L
+        private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f
 
         private fun formatTime(milliseconds: Long): String {

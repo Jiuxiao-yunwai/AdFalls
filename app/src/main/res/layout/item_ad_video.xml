@@ -64,8 +64,9 @@
                 android:layout_width="0dp"
                 android:layout_height="4dp"
                 android:layout_weight="1"
-                android:max="1000"
-                android:progress="0" />
+                android:max="10000"
+                android:progress="0"
+                android:progressDrawable="@drawable/bg_video_progress_white" />
 
             <TextView
                 android:id="@+id/video_time"
