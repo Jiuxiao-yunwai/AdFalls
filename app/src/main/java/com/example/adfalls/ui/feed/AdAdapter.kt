@@ -31,10 +31,23 @@ class AdAdapter(
     private var footerText: String? = null
 
     fun submitAds(items: List<AdItem>, footerText: String? = null, commitCallback: (() -> Unit)? = null) {
+        val oldFooterText = this.footerText
+        val oldFooterPosition = currentList.size
         this.footerText = footerText
         submitList(items) {
-            notifyDataSetChanged()
+            notifyFooterChanged(oldFooterText, footerText, oldFooterPosition)
             commitCallback?.invoke()
+        }
+    }
+
+    private fun notifyFooterChanged(oldFooterText: String?, newFooterText: String?, oldFooterPosition: Int) {
+        val newFooterPosition = currentList.size
+        when {
+            oldFooterText == null && newFooterText != null -> notifyItemInserted(newFooterPosition)
+            oldFooterText != null && newFooterText == null -> notifyItemRemoved(oldFooterPosition)
+            oldFooterText != null && newFooterText != null && oldFooterText != newFooterText -> {
+                notifyItemChanged(newFooterPosition)
+            }
         }
     }
 
@@ -61,6 +74,14 @@ class AdAdapter(
             is AdViewHolder -> holder.bind(getItem(position))
             is EndViewHolder -> holder.bind(footerText.orEmpty())
         }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (holder is AdViewHolder && payloads.contains(VideoStatePayload)) {
+            holder.updateVideoState(getItem(position))
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
@@ -119,17 +140,7 @@ class AdAdapter(
                 mute?.alpha = 1f
                 mute?.visibility = View.VISIBLE
                 startProgressUpdates(ad.id)
-                if (ad.playing) {
-                    if (keepControlsVisibleOnNextBind) {
-                        keepControlsVisibleOnNextBind = false
-                        showPlaybackControls(scheduleHide = true)
-                    } else {
-                        hidePlaybackControls(animate = false)
-                    }
-                } else {
-                    keepControlsVisibleOnNextBind = false
-                    showPlaybackControls(scheduleHide = true)
-                }
+                updateVideoState(ad)
             } else {
                 keepControlsVisibleOnNextBind = false
                 mute?.visibility = View.GONE
@@ -180,6 +191,33 @@ class AdAdapter(
         fun getPlayerView(): PlayerView? = playerView
 
         fun getBoundAd(): AdItem? = boundAd
+
+        fun updateVideoState(ad: AdItem) {
+            boundAd = ad
+            video?.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
+            mute?.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
+            video?.contentDescription = if (ad.playing) "暂停" else "播放"
+            mute?.contentDescription = if (ad.muted) "取消静音" else "静音"
+            mute?.animate()?.cancel()
+            mute?.alpha = 1f
+            mute?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
+            if (ad.type != AdCardType.VIDEO) {
+                keepControlsVisibleOnNextBind = false
+                hidePlaybackControls(animate = false)
+                return
+            }
+            if (ad.playing) {
+                if (keepControlsVisibleOnNextBind) {
+                    keepControlsVisibleOnNextBind = false
+                    showPlaybackControls(scheduleHide = true)
+                } else {
+                    hidePlaybackControls(animate = false)
+                }
+            } else {
+                keepControlsVisibleOnNextBind = false
+                showPlaybackControls(scheduleHide = true)
+            }
+        }
 
         private fun toggleVideoFromUser(ad: AdItem) {
             keepControlsVisibleOnNextBind = true
@@ -292,7 +330,20 @@ class AdAdapter(
     private object Diff : DiffUtil.ItemCallback<AdItem>() {
         override fun areItemsTheSame(oldItem: AdItem, newItem: AdItem): Boolean = oldItem.id == newItem.id
         override fun areContentsTheSame(oldItem: AdItem, newItem: AdItem): Boolean = oldItem == newItem
+
+        override fun getChangePayload(oldItem: AdItem, newItem: AdItem): Any? {
+            return if (
+                oldItem.copy(playing = newItem.playing, muted = newItem.muted) == newItem &&
+                (oldItem.playing != newItem.playing || oldItem.muted != newItem.muted)
+            ) {
+                VideoStatePayload
+            } else {
+                null
+            }
+        }
     }
+
+    private object VideoStatePayload
 
     private companion object {
         private const val VIDEO_PROGRESS_INTERVAL_MS = 33L

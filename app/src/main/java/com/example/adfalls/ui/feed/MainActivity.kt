@@ -13,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -80,11 +81,13 @@ class MainActivity : ComponentActivity() {
         outgoingRecyclerView = findViewById(R.id.ad_list_outgoing)
         outgoingRecyclerView.layoutManager = outgoingLayoutManager
         outgoingRecyclerView.adapter = outgoingAdapter
+        (outgoingRecyclerView.itemAnimator as? DefaultItemAnimator)?.supportsChangeAnimations = false
         outgoingRecyclerView.isEnabled = false
 
         recyclerView = findViewById(R.id.ad_list)
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
+        (recyclerView.itemAnimator as? DefaultItemAnimator)?.supportsChangeAnimations = false
         swipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
 

@@ -31,6 +31,7 @@ class DetailActivity : ComponentActivity() {
     private val controlsHandler = Handler(Looper.getMainLooper())
     private var hideControlsRunnable: Runnable? = null
     private var keepControlsVisibleOnNextRender = false
+    private var lastRenderedAd: AdItem? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,7 +70,13 @@ class DetailActivity : ComponentActivity() {
             finish()
             return
         }
+        if (lastRenderedAd?.isOnlyVideoStateChanged(ad) == true) {
+            renderVideoState(ad)
+            lastRenderedAd = ad
+            return
+        }
         render(ad)
+        lastRenderedAd = ad
     }
 
     private fun render(ad: AdItem) {
@@ -150,6 +157,30 @@ class DetailActivity : ComponentActivity() {
             keepControlsVisibleOnNextRender = true
             showPlaybackControls(scheduleHide = true)
             viewModel.toggleMute()
+        }
+    }
+
+    private fun renderVideoState(ad: AdItem) {
+        val video = findViewById<ImageButton>(R.id.detail_video)
+        val mute = findViewById<ImageButton>(R.id.detail_mute)
+        video.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
+        mute.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
+        video.contentDescription = if (ad.playing) "暂停" else "播放"
+        mute.contentDescription = if (ad.muted) "取消静音" else "静音"
+        mute.animate().cancel()
+        mute.alpha = 1f
+        mute.visibility = View.VISIBLE
+
+        if (ad.playing) {
+            if (keepControlsVisibleOnNextRender) {
+                keepControlsVisibleOnNextRender = false
+                showPlaybackControls(scheduleHide = true)
+            } else {
+                hidePlaybackControls(animate = false)
+            }
+        } else {
+            keepControlsVisibleOnNextRender = false
+            showPlaybackControls(scheduleHide = true)
         }
     }
 
@@ -273,4 +304,9 @@ class DetailActivity : ComponentActivity() {
             return "$minutes:${seconds.toString().padStart(2, '0')}"
         }
     }
+}
+
+private fun AdItem.isOnlyVideoStateChanged(newAd: AdItem): Boolean {
+    return copy(playing = newAd.playing, muted = newAd.muted) == newAd &&
+        (playing != newAd.playing || muted != newAd.muted)
 }
