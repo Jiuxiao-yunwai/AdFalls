@@ -148,6 +148,11 @@ object AdRepository {
         }
     }
 
+    suspend fun setAllVideoMuted(muted: Boolean) = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        dao().updateAllVideoMuted(muted)
+    }
+
     private fun dao(): AdDao {
         return checkNotNull(adDao) { "AdRepository must be initialized from AdFallsApp before use." }
     }

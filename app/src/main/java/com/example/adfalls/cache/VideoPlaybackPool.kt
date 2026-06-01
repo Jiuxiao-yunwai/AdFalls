@@ -16,6 +16,7 @@ object VideoPlaybackPool {
     private var activeVideoId: Long? = null
     private var activeVideoUrl: String? = null
     private var attachedView: PlayerView? = null
+    private var sharedMuted: Boolean? = null
     private val playbackPositions = mutableMapOf<Long, Long>()
     private val playbackDurations = mutableMapOf<Long, Long>()
 
@@ -25,15 +26,15 @@ object VideoPlaybackPool {
 
     // Reuses one shared ExoPlayer so only one video is active at a time.
     fun attach(playerView: PlayerView, id: Long, videoUrl: String?, playing: Boolean, muted: Boolean) {
-        if (!playing || videoUrl.isNullOrBlank() || activeVideoId != id) {
+        if (videoUrl.isNullOrBlank() || activeVideoId != id || activeVideoUrl != videoUrl) {
             if (attachedView == playerView) playerView.player = null
             return
         }
         attachedView?.takeIf { it != playerView }?.player = null
         attachedView = playerView
         playerView.player = requirePlayer().apply {
-            volume = if (muted) 0f else 1f
-            playWhenReady = true
+            volume = if (resolveMuted(muted)) 0f else 1f
+            playWhenReady = playing
         }
     }
 
@@ -74,6 +75,7 @@ object VideoPlaybackPool {
     // Play state is written through AdRepository so Room keeps list and detail in sync.
     suspend fun play(id: Long, videoUrl: String?, muted: Boolean) {
         if (videoUrl.isNullOrBlank()) return
+        val effectiveMuted = resolveMuted(muted)
         withContext(Dispatchers.Main) {
             val player = requirePlayer()
             if (activeVideoId != id || activeVideoUrl != videoUrl) {
@@ -88,15 +90,16 @@ object VideoPlaybackPool {
             activeVideoId = id
             activeVideoUrl = videoUrl
             player.repeatMode = Player.REPEAT_MODE_ONE
-            player.volume = if (muted) 0f else 1f
+            player.volume = if (effectiveMuted) 0f else 1f
             player.playWhenReady = true
             player.play()
         }
-        AdRepository.setVideoState(id, playing = true, muted = muted)
+        AdRepository.setVideoState(id, playing = true, muted = effectiveMuted)
     }
 
     suspend fun playInFeed(id: Long, videoUrl: String?, muted: Boolean, playerView: PlayerView) {
         if (videoUrl.isNullOrBlank()) return
+        val effectiveMuted = resolveMuted(muted)
         var previousVideoId: Long? = null
         withContext(Dispatchers.Main) {
             val player = requirePlayer()
@@ -114,23 +117,21 @@ object VideoPlaybackPool {
             activeVideoId = id
             activeVideoUrl = videoUrl
             player.repeatMode = Player.REPEAT_MODE_ONE
-            player.volume = if (muted) 0f else 1f
+            player.volume = if (effectiveMuted) 0f else 1f
             player.playWhenReady = true
             player.play()
         }
         previousVideoId?.takeIf { it != id }?.let {
             AdRepository.setVideoState(it, playing = false)
         }
-        AdRepository.setVideoState(id, playing = true, muted = muted)
+        AdRepository.setVideoState(id, playing = true, muted = effectiveMuted)
     }
 
     suspend fun pause(id: Long) {
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
                 saveActiveProgress()
-                requirePlayer().pause()
-                activeVideoId = null
-                activeVideoUrl = null
+                player?.pause()
             }
         }
         AdRepository.setVideoState(id, playing = false)
@@ -151,13 +152,14 @@ object VideoPlaybackPool {
     }
 
     suspend fun toggleMute(id: Long) {
-        val muted = !(AdRepository.findAd(id)?.muted ?: true)
+        val muted = !(sharedMuted ?: AdRepository.findAd(id)?.muted ?: true)
+        sharedMuted = muted
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
                 requirePlayer().volume = if (muted) 0f else 1f
             }
         }
-        AdRepository.setVideoState(id, muted = muted)
+        AdRepository.setAllVideoMuted(muted)
     }
 
     // Call from a host's final teardown path when the shared player is no longer needed.
@@ -169,8 +171,15 @@ object VideoPlaybackPool {
         activeVideoUrl = null
         playbackPositions.clear()
         playbackDurations.clear()
+        sharedMuted = null
         player?.release()
         player = null
+    }
+
+    private fun resolveMuted(fallback: Boolean): Boolean {
+        val muted = sharedMuted ?: fallback
+        sharedMuted = muted
+        return muted
     }
 
     private fun saveActiveProgress() {

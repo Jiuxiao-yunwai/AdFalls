@@ -90,14 +90,20 @@ class DetailActivity : ComponentActivity() {
         if (ad.type == AdCardType.VIDEO) {
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
             startProgressUpdates(ad.id)
+            findViewById<View>(R.id.detail_mute).apply {
+                animate().cancel()
+                alpha = 1f
+                visibility = View.VISIBLE
+            }
             if (ad.playing) {
-                hideControls(animate = false)
+                hidePlaybackControls(animate = false)
             } else {
-                showControls(scheduleHide = true)
+                showPlaybackControls(scheduleHide = true)
             }
         } else {
             stopProgressUpdates()
-            hideControls(animate = false)
+            hidePlaybackControls(animate = false)
+            findViewById<View>(R.id.detail_mute).visibility = View.GONE
             VideoPlaybackPool.detach(playerView)
         }
 
@@ -126,16 +132,16 @@ class DetailActivity : ComponentActivity() {
         share.setOnClickListener { viewModel.share() }
         playerView.setOnClickListener {
             if (ad.type == AdCardType.VIDEO) {
-                showControls(scheduleHide = true)
+                showPlaybackControls(scheduleHide = true)
                 viewModel.toggleVideoPlay()
             }
         }
         video.setOnClickListener {
-            showControls(scheduleHide = true)
+            showPlaybackControls(scheduleHide = true)
             viewModel.toggleVideoPlay()
         }
         mute.setOnClickListener {
-            showControls(scheduleHide = true)
+            showPlaybackControls(scheduleHide = true)
             viewModel.toggleMute()
         }
     }
@@ -155,22 +161,25 @@ class DetailActivity : ComponentActivity() {
         progressRunnable = null
     }
 
-    private fun showControls(scheduleHide: Boolean) {
+    private fun showPlaybackControls(scheduleHide: Boolean) {
         stopPendingControlHide()
-        controlViews().forEach { control ->
+        playbackControlViews().forEach { control ->
             control.animate().cancel()
-            control.alpha = 1f
             control.visibility = View.VISIBLE
+            control.animate()
+                .alpha(1f)
+                .setDuration(CONTROLS_FADE_DURATION_MS)
+                .start()
         }
         if (scheduleHide) {
-            hideControlsRunnable = Runnable { hideControls(animate = true) }
+            hideControlsRunnable = Runnable { hidePlaybackControls(animate = true) }
             controlsHandler.postDelayed(hideControlsRunnable!!, CONTROLS_AUTO_HIDE_MS)
         }
     }
 
-    private fun hideControls(animate: Boolean) {
+    private fun hidePlaybackControls(animate: Boolean) {
         stopPendingControlHide()
-        controlViews().forEach { control ->
+        playbackControlViews().forEach { control ->
             control.animate().cancel()
             if (animate && control.visibility == View.VISIBLE) {
                 control.animate()
@@ -190,10 +199,9 @@ class DetailActivity : ComponentActivity() {
         hideControlsRunnable = null
     }
 
-    private fun controlViews(): List<View> {
+    private fun playbackControlViews(): List<View> {
         return listOf(
             findViewById(R.id.detail_video),
-            findViewById(R.id.detail_mute),
             findViewById(R.id.detail_progress_panel)
         )
     }
@@ -239,7 +247,7 @@ class DetailActivity : ComponentActivity() {
         private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f
         private const val CONTROLS_AUTO_HIDE_MS = 2_000L
-        private const val CONTROLS_FADE_DURATION_MS = 220L
+        private const val CONTROLS_FADE_DURATION_MS = 500L
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = milliseconds.coerceAtLeast(0L) / 1000L

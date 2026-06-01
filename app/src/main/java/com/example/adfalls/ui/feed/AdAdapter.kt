@@ -114,14 +114,18 @@ class AdAdapter(
             video?.contentDescription = if (ad.playing) "暂停" else "播放"
             mute?.contentDescription = if (ad.muted) "取消静音" else "静音"
             if (ad.type == AdCardType.VIDEO) {
+                mute?.animate()?.cancel()
+                mute?.alpha = 1f
+                mute?.visibility = View.VISIBLE
                 startProgressUpdates(ad.id)
                 if (ad.playing) {
-                    hideControls(animate = false)
+                    hidePlaybackControls(animate = false)
                 } else {
-                    showControls(scheduleHide = true)
+                    showPlaybackControls(scheduleHide = true)
                 }
             } else {
-                hideControls(animate = false)
+                mute?.visibility = View.GONE
+                hidePlaybackControls(animate = false)
             }
 
             resizeMedia(ad.type)
@@ -140,7 +144,7 @@ class AdAdapter(
             itemView.setOnClickListener { onCardClick(ad) }
             media.setOnClickListener {
                 if (ad.type == AdCardType.VIDEO) {
-                    showControls(scheduleHide = true)
+                    showPlaybackControls(scheduleHide = true)
                     onVideoClick(ad)
                 } else {
                     onCardClick(ad)
@@ -151,11 +155,11 @@ class AdAdapter(
             share.setOnClickListener { onShareClick(ad) }
             tags.setOnClickListener { ad.tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener {
-                showControls(scheduleHide = true)
+                showPlaybackControls(scheduleHide = true)
                 onVideoClick(ad)
             }
             mute?.setOnClickListener {
-                showControls(scheduleHide = true)
+                showPlaybackControls(scheduleHide = true)
                 onMuteClick(ad)
             }
         }
@@ -184,22 +188,25 @@ class AdAdapter(
             progressRunnable = null
         }
 
-        private fun showControls(scheduleHide: Boolean) {
+        private fun showPlaybackControls(scheduleHide: Boolean) {
             stopPendingControlHide()
-            controlViews().forEach { control ->
+            playbackControlViews().forEach { control ->
                 control.animate().cancel()
-                control.alpha = 1f
                 control.visibility = View.VISIBLE
+                control.animate()
+                    .alpha(1f)
+                    .setDuration(CONTROLS_FADE_DURATION_MS)
+                    .start()
             }
             if (scheduleHide) {
-                hideControlsRunnable = Runnable { hideControls(animate = true) }
+                hideControlsRunnable = Runnable { hidePlaybackControls(animate = true) }
                 controlsHandler.postDelayed(hideControlsRunnable!!, CONTROLS_AUTO_HIDE_MS)
             }
         }
 
-        private fun hideControls(animate: Boolean) {
+        private fun hidePlaybackControls(animate: Boolean) {
             stopPendingControlHide()
-            controlViews().forEach { control ->
+            playbackControlViews().forEach { control ->
                 control.animate().cancel()
                 if (animate && control.visibility == View.VISIBLE) {
                     control.animate()
@@ -219,8 +226,8 @@ class AdAdapter(
             hideControlsRunnable = null
         }
 
-        private fun controlViews(): List<View> {
-            return listOfNotNull(video, mute, progressPanel)
+        private fun playbackControlViews(): List<View> {
+            return listOfNotNull(video, progressPanel)
         }
 
         private fun updateProgress(adId: Long) {
@@ -277,7 +284,7 @@ class AdAdapter(
         private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f
         private const val CONTROLS_AUTO_HIDE_MS = 2_000L
-        private const val CONTROLS_FADE_DURATION_MS = 220L
+        private const val CONTROLS_FADE_DURATION_MS = 500L
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)

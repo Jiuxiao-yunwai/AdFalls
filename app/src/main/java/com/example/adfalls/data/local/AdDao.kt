@@ -35,6 +35,9 @@ interface AdDao {
     @Query("UPDATE ads SET playing = :playing, muted = :muted WHERE id = :id")
     suspend fun updateVideoState(id: Long, playing: Boolean, muted: Boolean)
 
+    @Query("UPDATE ads SET muted = :muted WHERE type = 'VIDEO'")
+    suspend fun updateAllVideoMuted(muted: Boolean)
+
     @Query("SELECT * FROM ads WHERE channel = :channel ORDER BY id ASC")
     suspend fun getAdsByChannel(channel: String): List<AdEntity>
 
