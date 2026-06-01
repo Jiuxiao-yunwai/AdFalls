@@ -350,7 +350,7 @@ class AdAdapter(
         private const val VIDEO_PROGRESS_INTERVAL_MS = 33L
         private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f
-        private const val CONTROLS_AUTO_HIDE_MS = 2_000L
+        private const val CONTROLS_AUTO_HIDE_MS = 1_000L
         private const val CONTROLS_FADE_DURATION_MS = 500L
 
         private fun formatTime(milliseconds: Long): String {
