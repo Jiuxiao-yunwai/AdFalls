@@ -34,6 +34,8 @@ class AdAdapter(
         }
     }
 
+    fun getAdAtAdapterPosition(position: Int): AdItem? = currentList.getOrNull(position)
+
     override fun getItemCount(): Int = super.getItemCount() + if (footerText != null) 1 else 0
 
     override fun getItemViewType(position: Int): Int {
@@ -81,8 +83,10 @@ class AdAdapter(
         private val video: TextView? = itemView.findViewById(R.id.action_video)
         private val mute: TextView? = itemView.findViewById(R.id.action_mute)
         private val playerView: PlayerView? = media as? PlayerView
+        private var boundAd: AdItem? = null
 
         fun bind(ad: AdItem) {
+            boundAd = ad
             title.text = ad.title
             brand.text = ad.brand
             summary.text = ad.summary
@@ -128,6 +132,10 @@ class AdAdapter(
         fun detachVideo() {
             playerView?.let(VideoPlaybackPool::detach)
         }
+
+        fun getPlayerView(): PlayerView? = playerView
+
+        fun getBoundAd(): AdItem? = boundAd
     }
 
     private fun mediaBackground(color: Int, type: AdCardType): GradientDrawable {

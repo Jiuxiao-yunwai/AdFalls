@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.data.model.AdCardType
+import com.example.adfalls.data.model.AdItem
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
     private var currentTabIndex = -1
     private var pendingSwitchDirection = 0
     private var outgoingSnapshotReady = false
+    private var scheduledFeedVideoId: Long? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,6 +114,7 @@ class MainActivity : ComponentActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 registerVisibleImpressions()
+                scheduleFeedVideoAutoplay()
                 val state = viewModel.uiState.value
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
                 if (!state.loadingMore &&
@@ -170,6 +174,7 @@ class MainActivity : ComponentActivity() {
         pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
         prepareOutgoingList(pendingSwitchDirection) {
             recyclerView.translationX = offscreenOffset(pendingSwitchDirection)
+            scheduledFeedVideoId = null
             viewModel.selectChannel(channel)
             updateTabs(channel)
             pendingListCommitChannel = channel
@@ -204,6 +209,7 @@ class MainActivity : ComponentActivity() {
                 pendingListCommitChannel = null
             }
             registerVisibleImpressions()
+            recyclerView.post { scheduleFeedVideoAutoplay() }
         }
     }
 
@@ -243,6 +249,56 @@ class MainActivity : ComponentActivity() {
         }
         viewModel.registerImpressions(visibleAdIds)
         viewModel.pauseVideosOutside(visibleAdIds)
+    }
+
+    private fun scheduleFeedVideoAutoplay() {
+        val candidate = findFirstFullyVisibleVideo()
+        if (candidate != null) {
+            val (ad, holder) = candidate
+            val playerView = holder.getPlayerView() ?: return
+            if (scheduledFeedVideoId != ad.id || !ad.playing) {
+                viewModel.autoPlayVisibleVideo(ad, playerView)
+            }
+            scheduledFeedVideoId = ad.id
+            return
+        }
+
+        val playingId = scheduledFeedVideoId ?: return
+        if (isAdFullyGone(playingId)) {
+            viewModel.pauseVideoIfGone(playingId)
+            scheduledFeedVideoId = null
+        }
+    }
+
+    private fun findFirstFullyVisibleVideo(): Pair<AdItem, AdAdapter.AdViewHolder>? {
+        if (adapter.itemCount == 0) return null
+        val first = layoutManager.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val last = layoutManager.findLastVisibleItemPosition().coerceAtMost(adapter.itemCount - 1)
+        if (last < first) return null
+
+        for (position in first..last) {
+            val ad = adapter.getAdAtAdapterPosition(position) ?: continue
+            if (ad.type != AdCardType.VIDEO) continue
+            if (!isItemFullyVisible(position)) continue
+            val holder = recyclerView.findViewHolderForAdapterPosition(position) as? AdAdapter.AdViewHolder
+            if (holder?.getBoundAd()?.id == ad.id) return ad to holder
+        }
+        return null
+    }
+
+    private fun isItemFullyVisible(position: Int): Boolean {
+        val child = layoutManager.findViewByPosition(position) ?: return false
+        val rvTop = recyclerView.paddingTop
+        val rvBottom = recyclerView.height - recyclerView.paddingBottom
+        return child.top >= rvTop && child.bottom <= rvBottom
+    }
+
+    private fun isAdFullyGone(adId: Long): Boolean {
+        val position = adapter.currentList.indexOfFirst { it.id == adId }
+        if (position == -1) return true
+        val child = layoutManager.findViewByPosition(position) ?: return true
+        return child.bottom <= recyclerView.paddingTop ||
+            child.top >= recyclerView.height - recyclerView.paddingBottom
     }
 
     private fun moveTabIndicator(activeIndex: Int) {

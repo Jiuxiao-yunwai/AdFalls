@@ -2,6 +2,7 @@ package com.example.adfalls.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.ui.PlayerView
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdItem
@@ -115,15 +116,25 @@ class FeedViewModel : ViewModel() {
         uiState.value.ads
             .filter { it.playing && it.id !in visible }
             .forEach { ad ->
-                viewModelScope.launch { VideoPlaybackPool.pause(ad.id) }
+                viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(ad.id) }
             }
+    }
+
+    fun autoPlayVisibleVideo(ad: AdItem, playerView: PlayerView) {
+        viewModelScope.launch {
+            VideoPlaybackPool.playInFeed(ad.id, ad.videoUrl, ad.muted, playerView)
+        }
+    }
+
+    fun pauseVideoIfGone(adId: Long) {
+        viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(adId) }
     }
 
     private fun pauseCurrentVideos() {
         uiState.value.ads
             .filter { it.playing }
             .forEach { ad ->
-                viewModelScope.launch { VideoPlaybackPool.pause(ad.id) }
+                viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(ad.id) }
             }
     }
 
