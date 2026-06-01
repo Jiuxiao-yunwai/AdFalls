@@ -61,32 +61,30 @@
                 android:background="#222222"
                 app:use_controller="false" />
 
-            <TextView
+            <ImageButton
                 android:id="@+id/detail_video"
-                android:layout_width="96dp"
-                android:layout_height="44dp"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
                 android:layout_gravity="center"
-                android:background="@drawable/bg_video_badge"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
+                android:background="@drawable/bg_video_control_circle"
+                android:contentDescription="播放"
+                android:padding="15dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_video_play"
                 android:visibility="gone" />
 
-            <TextView
+            <ImageButton
                 android:id="@+id/detail_mute"
-                android:layout_width="70dp"
-                android:layout_height="34dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_gravity="top|end"
                 android:layout_marginTop="12dp"
                 android:layout_marginEnd="12dp"
-                android:background="@drawable/bg_video_badge"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
+                android:background="@drawable/bg_video_control_circle"
+                android:contentDescription="静音"
+                android:padding="9dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_volume_off"
                 android:visibility="gone" />
 
             <LinearLayout

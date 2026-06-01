@@ -55,10 +55,14 @@ object VideoPlaybackPool {
 
     suspend fun togglePlay(id: Long) {
         val ad = AdRepository.findAd(id) ?: return
-        if (ad.playing) {
+        togglePlay(ad.id, ad.videoUrl, ad.playing, ad.muted)
+    }
+
+    suspend fun togglePlay(id: Long, videoUrl: String?, playing: Boolean, muted: Boolean) {
+        if (playing) {
             pause(id)
         } else {
-            play(id, ad.videoUrl, ad.muted)
+            play(id, videoUrl, muted)
         }
     }
 

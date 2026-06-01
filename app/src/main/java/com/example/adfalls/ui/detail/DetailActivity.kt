@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -93,15 +94,17 @@ class DetailActivity : ComponentActivity() {
         val like = findViewById<TextView>(R.id.detail_like)
         val favorite = findViewById<TextView>(R.id.detail_favorite)
         val share = findViewById<TextView>(R.id.detail_share)
-        val video = findViewById<TextView>(R.id.detail_video)
-        val mute = findViewById<TextView>(R.id.detail_mute)
+        val video = findViewById<ImageButton>(R.id.detail_video)
+        val mute = findViewById<ImageButton>(R.id.detail_mute)
         val progressPanel = findViewById<View>(R.id.detail_progress_panel)
 
         like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
         favorite.text = if (ad.favorited) "已收藏" else "收藏"
         share.text = "分享"
-        video.text = if (ad.playing) "暂停" else "播放"
-        mute.text = if (ad.muted) "静音" else "有声"
+        video.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
+        mute.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
+        video.contentDescription = if (ad.playing) "暂停" else "播放"
+        mute.contentDescription = if (ad.muted) "取消静音" else "静音"
         video.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
         mute.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
         progressPanel.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE

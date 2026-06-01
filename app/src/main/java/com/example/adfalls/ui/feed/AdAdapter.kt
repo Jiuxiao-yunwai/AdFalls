@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.media3.ui.PlayerView
@@ -83,8 +84,8 @@ class AdAdapter(
         private val like: TextView = itemView.findViewById(R.id.action_like)
         private val favorite: TextView = itemView.findViewById(R.id.action_favorite)
         private val share: TextView = itemView.findViewById(R.id.action_share)
-        private val video: TextView? = itemView.findViewById(R.id.action_video)
-        private val mute: TextView? = itemView.findViewById(R.id.action_mute)
+        private val video: ImageButton? = itemView.findViewById(R.id.action_video)
+        private val mute: ImageButton? = itemView.findViewById(R.id.action_mute)
         private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
         private val progress: ProgressBar? = itemView.findViewById(R.id.video_progress)
         private val time: TextView? = itemView.findViewById(R.id.video_time)
@@ -104,8 +105,10 @@ class AdAdapter(
             like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
             favorite.text = if (ad.favorited) "已收藏" else "收藏"
             share.text = "分享 ${ad.shares}"
-            video?.text = if (ad.playing) "暂停" else "播放"
-            mute?.text = if (ad.muted) "静音" else "有声"
+            video?.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
+            mute?.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
+            video?.contentDescription = if (ad.playing) "暂停" else "播放"
+            mute?.contentDescription = if (ad.muted) "取消静音" else "静音"
             video?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
             mute?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
             progressPanel?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE

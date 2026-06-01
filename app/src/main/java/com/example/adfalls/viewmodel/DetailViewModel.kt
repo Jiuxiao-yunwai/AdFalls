@@ -60,27 +60,27 @@ class DetailViewModel : ViewModel() {
     }
 
     fun playVideo() {
-        withVideoAd { id -> VideoPlaybackPool.play(id) }
+        withVideoAd { ad -> VideoPlaybackPool.play(ad.id, ad.videoUrl, ad.muted) }
     }
 
     fun pauseVideo() {
-        withVideoAd { id -> VideoPlaybackPool.pause(id) }
+        withVideoAd { ad -> VideoPlaybackPool.pause(ad.id) }
     }
 
     fun toggleVideoPlay() {
-        withVideoAd { id -> VideoPlaybackPool.togglePlay(id) }
+        withVideoAd { ad -> VideoPlaybackPool.togglePlay(ad.id, ad.videoUrl, ad.playing, ad.muted) }
     }
 
     fun toggleMute() {
-        withVideoAd { id -> VideoPlaybackPool.toggleMute(id) }
+        withVideoAd { ad -> VideoPlaybackPool.toggleMute(ad.id) }
     }
 
-    private fun withVideoAd(action: suspend (Long) -> Unit) {
+    private fun withVideoAd(action: suspend (AdItem) -> Unit) {
         val id = adId.value ?: return
         viewModelScope.launch {
             val ad = uiState.value.ad ?: AdRepository.findAd(id)
             if (ad?.type == AdCardType.VIDEO) {
-                action(id)
+                action(ad)
             }
         }
     }

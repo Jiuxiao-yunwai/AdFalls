@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
             onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
             onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
             onShareClick = { ad -> viewModel.share(ad.id) },
-            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad.id) },
+            onVideoClick = { ad -> viewModel.toggleVideoPlay(ad) },
             onMuteClick = { ad -> viewModel.toggleMute(ad.id) },
             onTagClick = { tag -> viewModel.selectTag(tag) }
         )

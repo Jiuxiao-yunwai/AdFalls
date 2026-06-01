@@ -33,6 +33,7 @@ class FeedViewModel : ViewModel() {
     private val selectedTag = MutableStateFlow<String?>(null)
     private val loadingMore = MutableStateFlow(false)
     private val endReached = MutableStateFlow(false)
+    private val manuallyPausedVideoIds = mutableSetOf<Long>()
 
     private val channelAds = activeChannel.flatMapLatest { channel ->
         AdRepository.observeAdsByChannel(channel).map { ads -> channel to ads }
@@ -62,6 +63,7 @@ class FeedViewModel : ViewModel() {
 
     fun selectChannel(channel: AdChannel) {
         pauseCurrentVideos()
+        manuallyPausedVideoIds.clear()
         activeChannel.value = channel
         endReached.value = false
     }
@@ -113,6 +115,7 @@ class FeedViewModel : ViewModel() {
 
     fun pauseVideosOutside(visibleAdIds: List<Long>) {
         val visible = visibleAdIds.toSet()
+        manuallyPausedVideoIds.removeAll { it !in visible }
         uiState.value.ads
             .filter { it.playing && it.id !in visible }
             .forEach { ad ->
@@ -121,12 +124,14 @@ class FeedViewModel : ViewModel() {
     }
 
     fun autoPlayVisibleVideo(ad: AdItem, playerView: PlayerView) {
+        if (ad.id in manuallyPausedVideoIds) return
         viewModelScope.launch {
             VideoPlaybackPool.playInFeed(ad.id, ad.videoUrl, ad.muted, playerView)
         }
     }
 
     fun pauseVideoIfGone(adId: Long) {
+        manuallyPausedVideoIds.remove(adId)
         viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(adId) }
     }
 
@@ -148,6 +153,17 @@ class FeedViewModel : ViewModel() {
 
     fun share(adId: Long) {
         viewModelScope.launch { AdRepository.share(adId) }
+    }
+
+    fun toggleVideoPlay(ad: AdItem) {
+        if (ad.playing) {
+            manuallyPausedVideoIds.add(ad.id)
+        } else {
+            manuallyPausedVideoIds.remove(ad.id)
+        }
+        viewModelScope.launch {
+            VideoPlaybackPool.togglePlay(ad.id, ad.videoUrl, ad.playing, ad.muted)
+        }
     }
 
     fun toggleVideoPlay(adId: Long) {

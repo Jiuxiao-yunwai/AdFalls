@@ -19,32 +19,30 @@
             android:background="#222222"
             app:use_controller="false" />
 
-        <TextView
+        <ImageButton
             android:id="@+id/action_video"
-            android:layout_width="76dp"
-            android:layout_height="42dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_gravity="center"
-            android:background="@drawable/bg_video_badge"
-            android:gravity="center"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
+            android:background="@drawable/bg_video_control_circle"
+            android:contentDescription="播放"
+            android:padding="14dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_video_play"
             android:visibility="gone" />
 
-        <TextView
+        <ImageButton
             android:id="@+id/action_mute"
-            android:layout_width="62dp"
-            android:layout_height="32dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:layout_gravity="top|end"
             android:layout_marginTop="10dp"
             android:layout_marginEnd="10dp"
-            android:background="@drawable/bg_video_badge"
-            android:gravity="center"
-            android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:background="@drawable/bg_video_control_circle"
+            android:contentDescription="静音"
+            android:padding="9dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_volume_off"
             android:visibility="gone" />
 
         <LinearLayout

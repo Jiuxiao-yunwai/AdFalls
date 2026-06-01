@@ -24,7 +24,8 @@ import kotlinx.coroutines.withContext
 object AdRepository {
     private const val PAGE_SIZE = 6
     private const val FIXED_AD_COUNT = 50
-    private const val SAMPLE_VIDEO_URL = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
+    private const val OLD_SAMPLE_VIDEO_URL = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
+    private const val SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
     private var adDao: AdDao? = null
     private val operationMutex = Mutex()
     private val visibleRevision = MutableStateFlow(0)
@@ -149,7 +150,7 @@ object AdRepository {
 
     private suspend fun seedIfNeeded() {
         operationMutex.withLock {
-            if (dao().countAds() != FIXED_AD_COUNT) {
+            if (dao().countAds() != FIXED_AD_COUNT || dao().countAdsByVideoUrl(OLD_SAMPLE_VIDEO_URL) > 0) {
                 visibleIds.clear()
                 requestedIds.clear()
                 exposedIds.clear()
