@@ -1,6 +1,6 @@
 # AdFalls
 
-AdFalls 是一个单列广告信息流 App demo，使用 Kotlin + 传统 XML 布局实现。当前版本以本地 mock 数据模拟广告推荐、AI 摘要、智能标签、对话式搜索、互动状态和埋点统计。
+AdFalls 是一个单列广告信息流 App demo，使用 Kotlin + 传统 XML 布局实现。当前版本以本地 mock 数据驱动广告推荐、AI 摘要、智能标签和对话式搜索的降级体验，互动状态和埋点统计已通过 Room 落库，视频卡片已初步接入 Media3 ExoPlayer。
 
 ## 已实现功能
 
@@ -9,9 +9,11 @@ AdFalls 是一个单列广告信息流 App demo，使用 Kotlin + 传统 XML 布
 - 频道切换：顶部 Tab 支持精选、电商、本地三个频道，切换时刷新对应数据并保持列表位置。
 - 下拉刷新与上拉加载：SwipeRefreshLayout 下拉刷新，滚动到底部自动加载更多 mock 数据。
 - 详情页交互：点击卡片进入详情页，返回后列表位置保持。
-- 状态同步：点赞、收藏、分享、视频播放/暂停、静音状态在信息流和详情页之间共享。
-- 模拟播放器资源池：同一时间只保留一个视频处于播放状态。
-- 埋点统计：本地模拟曝光、点击、点赞、分享等统计数据，并在卡片和详情页展示。
+- 状态同步：点赞、收藏、分享、视频播放/暂停、静音状态在信息流和详情页之间共享，并写入 Room。
+- 信息流视频自动播放：视频广告完全进入列表可视区域后自动播放，完全离屏后自动暂停。
+- 视频控件：自动播放时隐藏播放和进度控件，点击视频后显示中央播放/暂停和底部进度，1 秒无操作后淡出；右上角静音按钮常驻并在视频间共享静音状态。
+- Media3 播放器资源池：同一时间只保留一个视频处于播放状态，暂停时复用 ExoPlayer 并保留播放进度。
+- 埋点统计：曝光、点击、点赞、分享等统计数据本地落库，并在卡片和详情页展示。
 - AI 能力降级：广告摘要、智能标签和自然语言搜索先由本地数据模拟，后续可替换为云端大模型接口。
 
 ## 运行方式
@@ -40,14 +42,18 @@ app/build/outputs/apk/debug/app-debug.apk
 - `app/src/main/java/com/example/adfalls/data/model`：广告频道、卡片类型和广告数据模型。
 - `app/src/main/java/com/example/adfalls/data/local`：Room 数据库、广告 Entity 和 DAO。
 - `app/src/main/java/com/example/adfalls/data/repository`：Room 读写入口、本地 mock 数据初始化、互动状态、统计数据和搜索逻辑。
-- `app/src/main/java/com/example/adfalls/cache`：模拟视频播放器资源复用。
+- `app/src/main/java/com/example/adfalls/cache`：Media3 ExoPlayer 共享播放器资源复用。
 - `res/layout/item_ad_large.xml`：大图广告卡片。
 - `res/layout/item_ad_small.xml`：小图广告卡片。
 - `res/layout/item_ad_video.xml`：视频广告卡片。
 
 ## 当前阶段
 
-当前项目已完成阶段 3：Room Flow + ViewModel StateFlow 自动状态同步，下一步进入网络和 AI 服务的后续阶段。
+当前处于阶段 5：视频能力收尾验证中。
+
+已完成阶段 1-4：MVVM 基础结构、Room 数据层、Room Flow + ViewModel StateFlow 状态同步，以及信息流体验完善。当前阶段继续验证 Media3 视频完全入屏自动播放、完全离屏自动暂停、1 秒自动隐藏控件、静音、详情页进入/返回同步和播放器生命周期。
+
+下一步为阶段 6：网络和 AI 服务，计划接入真实广告接口、AI 摘要、智能标签和对话式搜索能力。
 
 阶段进度见：
 
@@ -68,5 +74,4 @@ app/build/outputs/apk/debug/app-debug.apk
 
 - 将 `AdRepository` 替换为真实网络请求，例如 OkHttp。
 - 将本地 `summary` 和 `tags` 替换为云端大模型生成结果。
-- 将视频卡片的模拟状态替换为 Media3/ExoPlayer 播放器。
 - 将曝光和点击统计上报到服务端。
