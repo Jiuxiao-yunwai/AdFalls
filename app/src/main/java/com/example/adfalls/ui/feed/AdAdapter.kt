@@ -96,6 +96,7 @@ class AdAdapter(
         private var progressRunnable: Runnable? = null
         private val controlsHandler = Handler(Looper.getMainLooper())
         private var hideControlsRunnable: Runnable? = null
+        private var keepControlsVisibleOnNextBind = false
 
         fun bind(ad: AdItem) {
             stopProgressUpdates()
@@ -119,11 +120,18 @@ class AdAdapter(
                 mute?.visibility = View.VISIBLE
                 startProgressUpdates(ad.id)
                 if (ad.playing) {
-                    hidePlaybackControls(animate = false)
+                    if (keepControlsVisibleOnNextBind) {
+                        keepControlsVisibleOnNextBind = false
+                        showPlaybackControls(scheduleHide = true)
+                    } else {
+                        hidePlaybackControls(animate = false)
+                    }
                 } else {
+                    keepControlsVisibleOnNextBind = false
                     showPlaybackControls(scheduleHide = true)
                 }
             } else {
+                keepControlsVisibleOnNextBind = false
                 mute?.visibility = View.GONE
                 hidePlaybackControls(animate = false)
             }
@@ -144,8 +152,7 @@ class AdAdapter(
             itemView.setOnClickListener { onCardClick(ad) }
             media.setOnClickListener {
                 if (ad.type == AdCardType.VIDEO) {
-                    showPlaybackControls(scheduleHide = true)
-                    onVideoClick(ad)
+                    toggleVideoFromUser(ad)
                 } else {
                     onCardClick(ad)
                 }
@@ -155,10 +162,10 @@ class AdAdapter(
             share.setOnClickListener { onShareClick(ad) }
             tags.setOnClickListener { ad.tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener {
-                showPlaybackControls(scheduleHide = true)
-                onVideoClick(ad)
+                toggleVideoFromUser(ad)
             }
             mute?.setOnClickListener {
+                keepControlsVisibleOnNextBind = true
                 showPlaybackControls(scheduleHide = true)
                 onMuteClick(ad)
             }
@@ -173,6 +180,14 @@ class AdAdapter(
         fun getPlayerView(): PlayerView? = playerView
 
         fun getBoundAd(): AdItem? = boundAd
+
+        private fun toggleVideoFromUser(ad: AdItem) {
+            keepControlsVisibleOnNextBind = true
+            video?.setImageResource(if (ad.playing) R.drawable.ic_video_play else R.drawable.ic_video_pause)
+            video?.contentDescription = if (ad.playing) "播放" else "暂停"
+            showPlaybackControls(scheduleHide = true)
+            onVideoClick(ad)
+        }
 
         private fun startProgressUpdates(adId: Long) {
             progressRunnable = object : Runnable {

@@ -30,6 +30,7 @@ class DetailActivity : ComponentActivity() {
     private var progressRunnable: Runnable? = null
     private val controlsHandler = Handler(Looper.getMainLooper())
     private var hideControlsRunnable: Runnable? = null
+    private var keepControlsVisibleOnNextRender = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,12 +97,19 @@ class DetailActivity : ComponentActivity() {
                 visibility = View.VISIBLE
             }
             if (ad.playing) {
-                hidePlaybackControls(animate = false)
+                if (keepControlsVisibleOnNextRender) {
+                    keepControlsVisibleOnNextRender = false
+                    showPlaybackControls(scheduleHide = true)
+                } else {
+                    hidePlaybackControls(animate = false)
+                }
             } else {
+                keepControlsVisibleOnNextRender = false
                 showPlaybackControls(scheduleHide = true)
             }
         } else {
             stopProgressUpdates()
+            keepControlsVisibleOnNextRender = false
             hidePlaybackControls(animate = false)
             findViewById<View>(R.id.detail_mute).visibility = View.GONE
             VideoPlaybackPool.detach(playerView)
@@ -132,18 +140,27 @@ class DetailActivity : ComponentActivity() {
         share.setOnClickListener { viewModel.share() }
         playerView.setOnClickListener {
             if (ad.type == AdCardType.VIDEO) {
-                showPlaybackControls(scheduleHide = true)
-                viewModel.toggleVideoPlay()
+                toggleVideoFromUser(ad)
             }
         }
         video.setOnClickListener {
-            showPlaybackControls(scheduleHide = true)
-            viewModel.toggleVideoPlay()
+            toggleVideoFromUser(ad)
         }
         mute.setOnClickListener {
+            keepControlsVisibleOnNextRender = true
             showPlaybackControls(scheduleHide = true)
             viewModel.toggleMute()
         }
+    }
+
+    private fun toggleVideoFromUser(ad: AdItem) {
+        keepControlsVisibleOnNextRender = true
+        findViewById<ImageButton>(R.id.detail_video).apply {
+            setImageResource(if (ad.playing) R.drawable.ic_video_play else R.drawable.ic_video_pause)
+            contentDescription = if (ad.playing) "播放" else "暂停"
+        }
+        showPlaybackControls(scheduleHide = true)
+        viewModel.toggleVideoPlay()
     }
 
     private fun startProgressUpdates(adId: Long) {
