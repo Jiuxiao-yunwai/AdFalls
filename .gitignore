@@ -1,6 +1,8 @@
 *.iml
 .gradle
 .kotlin
+.codex_compare/
+AdFalls-main.zip
 /local.properties
 /.idea/
 .DS_Store

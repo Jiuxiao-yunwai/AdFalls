@@ -25,12 +25,14 @@ object MockVideoGenerator {
 
     fun ensureVideos(context: Context): List<String> {
         val dir = File(context.filesDir, "mock_videos").apply { mkdirs() }
-        return specs.map { spec ->
+        return specs.mapNotNull { spec ->
             val file = File(dir, spec.fileName)
-            if (!file.exists() || file.length() < 1024L) {
-                createVideo(file, spec)
-            }
-            file.toURI().toString()
+            runCatching {
+                if (!file.exists() || file.length() < 1024L) {
+                    createVideo(file, spec)
+                }
+                file.takeIf { it.exists() && it.length() >= 1024L }?.toURI()?.toString()
+            }.getOrNull()
         }
     }
 
@@ -171,7 +173,7 @@ object MockVideoGenerator {
                 }
                 colorFormat?.let { EncoderSelection(info, it) }
             }
-            .first()
+            .firstOrNull() ?: error("No supported AVC encoder found.")
     }
 
     private fun rgbToYuv(r: Int, g: Int, b: Int): YuvColor {

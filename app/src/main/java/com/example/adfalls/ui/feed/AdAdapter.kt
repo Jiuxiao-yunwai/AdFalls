@@ -31,23 +31,12 @@ class AdAdapter(
     private var footerText: String? = null
 
     fun submitAds(items: List<AdItem>, footerText: String? = null, commitCallback: (() -> Unit)? = null) {
-        val oldFooterText = this.footerText
-        val oldFooterPosition = currentList.size
-        this.footerText = footerText
         submitList(items) {
-            notifyFooterChanged(oldFooterText, footerText, oldFooterPosition)
-            commitCallback?.invoke()
-        }
-    }
-
-    private fun notifyFooterChanged(oldFooterText: String?, newFooterText: String?, oldFooterPosition: Int) {
-        val newFooterPosition = currentList.size
-        when {
-            oldFooterText == null && newFooterText != null -> notifyItemInserted(newFooterPosition)
-            oldFooterText != null && newFooterText == null -> notifyItemRemoved(oldFooterPosition)
-            oldFooterText != null && newFooterText != null && oldFooterText != newFooterText -> {
-                notifyItemChanged(newFooterPosition)
+            if (this.footerText != footerText) {
+                this.footerText = footerText
+                notifyDataSetChanged()
             }
+            commitCallback?.invoke()
         }
     }
 

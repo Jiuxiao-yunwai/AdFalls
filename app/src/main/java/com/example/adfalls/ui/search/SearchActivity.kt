@@ -21,11 +21,11 @@ import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.feed.AdAdapter
-import com.example.adfalls.viewmodel.FeedViewModel
+import com.example.adfalls.viewmodel.SearchViewModel
 import kotlinx.coroutines.launch
 
 class SearchActivity : ComponentActivity() {
-    private lateinit var viewModel: FeedViewModel
+    private lateinit var viewModel: SearchViewModel
     private lateinit var adapter: AdAdapter
     private lateinit var input: EditText
     private lateinit var emptyState: TextView
@@ -40,7 +40,7 @@ class SearchActivity : ComponentActivity() {
             ?.let { runCatching { AdChannel.valueOf(it) }.getOrNull() }
             ?: AdChannel.FEATURED
 
-        viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
+        viewModel = ViewModelProvider.create(this)[SearchViewModel::class]
         viewModel.selectChannel(channel)
 
         input = findViewById(R.id.search_input)
@@ -71,9 +71,11 @@ class SearchActivity : ComponentActivity() {
 
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 viewModel.updateSearchText(s?.toString().orEmpty())
             }
+
             override fun afterTextChanged(s: Editable?) = Unit
         })
 
@@ -82,14 +84,15 @@ class SearchActivity : ComponentActivity() {
                 viewModel.uiState.collect { state ->
                     adapter.submitAds(state.ads)
                     emptyState.visibility = when {
+                        state.loading -> View.VISIBLE
                         state.searchText.isBlank() -> View.VISIBLE
                         state.ads.isEmpty() -> View.VISIBLE
                         else -> View.GONE
                     }
-                    emptyState.text = if (state.searchText.isBlank()) {
-                        "输入关键词，搜索标题、品牌、摘要或标签"
-                    } else {
-                        "没有找到“${state.searchText}”相关广告"
+                    emptyState.text = when {
+                        state.loading -> "搜索中..."
+                        state.searchText.isBlank() -> "输入关键词，搜索标题、品牌、摘要或标签"
+                        else -> "没有找到“${state.searchText}”相关广告"
                     }
                 }
             }
