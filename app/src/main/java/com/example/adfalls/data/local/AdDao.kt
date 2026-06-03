@@ -35,6 +35,9 @@ interface AdDao {
     @Query("UPDATE ads SET playing = :playing, muted = :muted WHERE id = :id")
     suspend fun updateVideoState(id: Long, playing: Boolean, muted: Boolean)
 
+    @Query("UPDATE ads SET muted = :muted WHERE type = 'VIDEO'")
+    suspend fun updateAllVideoMuted(muted: Boolean)
+
     @Query("SELECT * FROM ads WHERE channel = :channel ORDER BY id ASC")
     suspend fun getAdsByChannel(channel: String): List<AdEntity>
 
@@ -46,6 +49,12 @@ interface AdDao {
 
     @Query("SELECT COUNT(*) FROM ads")
     suspend fun countAds(): Int
+
+    @Query("SELECT COUNT(*) FROM ads WHERE videoUrl = :videoUrl")
+    suspend fun countAdsByVideoUrl(videoUrl: String): Int
+
+    @Query("SELECT COUNT(*) FROM ads WHERE videoUrl IS NOT NULL AND videoUrl NOT LIKE :prefix || '%'")
+    suspend fun countVideoAdsNotStartingWith(prefix: String): Int
 
     @Query("SELECT MAX(id) FROM ads")
     suspend fun maxAdId(): Long?
