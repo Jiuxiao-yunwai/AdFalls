@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#050505"
@@ -45,7 +46,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:textColor="#9A9A9A"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        tools:text="当前频道：精选" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/ai_chat_messages"
@@ -54,7 +56,9 @@
         android:layout_marginTop="12dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="14dp" />
+        android:paddingBottom="14dp"
+        tools:itemCount="4"
+        tools:listitem="@layout/item_chat_assistant" />
 
     <LinearLayout
         android:layout_width="match_parent"

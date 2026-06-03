@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -100,7 +101,20 @@ class AdAdapter(
         private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
         private val progress: ProgressBar? = itemView.findViewById(R.id.video_progress)
         private val time: TextView? = itemView.findViewById(R.id.video_time)
-        private val playerView: PlayerView? = media as? PlayerView
+        private val _playerView: PlayerView? by lazy {
+            if (itemView.isInEditMode) return@lazy null
+            (media as? ViewGroup)?.let { container ->
+                PlayerView(itemView.context).apply {
+                    useController = false
+                    useArtwork = false
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    container.addView(this, 0)
+                }
+            }
+        }
         private var boundAd: AdItem? = null
         private val progressHandler = Handler(Looper.getMainLooper())
         private var progressRunnable: Runnable? = null
@@ -138,8 +152,8 @@ class AdAdapter(
 
             resizeMedia(ad.type)
             media.background = mediaBackground(ad.mediaColor, ad.type)
-            playerView?.useController = false
-            playerView?.let {
+            _playerView?.useController = false
+            _playerView?.let {
                 VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
             }
             like.isSelected = ad.liked
@@ -158,6 +172,9 @@ class AdAdapter(
                     onCardClick(currentAd)
                 }
             }
+            _playerView?.setOnClickListener {
+                toggleVideoFromUser(boundAd ?: ad)
+            }
             like.setOnClickListener { onLikeClick(boundAd ?: ad) }
             favorite.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
             share.setOnClickListener { onShareClick(boundAd ?: ad) }
@@ -175,10 +192,10 @@ class AdAdapter(
         fun detachVideo() {
             stopProgressUpdates()
             stopPendingControlHide()
-            playerView?.let(VideoPlaybackPool::detach)
+            _playerView?.let(VideoPlaybackPool::detach)
         }
 
-        fun getPlayerView(): PlayerView? = playerView
+        fun getPlayerView(): PlayerView? = _playerView
 
         fun getBoundAd(): AdItem? = boundAd
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#050505"
@@ -141,7 +142,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:paddingBottom="22dp" />
+                android:paddingBottom="22dp"
+                tools:itemCount="3"
+                tools:listitem="@layout/item_ad_large" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/ad_list_outgoing"
@@ -149,7 +152,9 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingBottom="22dp"
-                android:visibility="gone" />
+                android:visibility="gone"
+                tools:itemCount="3"
+                tools:listitem="@layout/item_ad_large" />
 
             <TextView
                 android:id="@+id/feed_empty_state"

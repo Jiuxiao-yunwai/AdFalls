@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="14dp"
@@ -13,13 +13,12 @@
         android:layout_width="match_parent"
         android:layout_height="190dp">
 
-        <androidx.media3.ui.PlayerView
+        <FrameLayout
             android:id="@+id/ad_media"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#222222"
-            app:resize_mode="zoom"
-            app:use_controller="false" />
+            tools:background="#222222" />
 
         <ImageButton
             android:id="@+id/action_video"
@@ -31,7 +30,8 @@
             android:padding="14dp"
             android:scaleType="center"
             android:src="@drawable/ic_video_play"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <ImageButton
             android:id="@+id/action_mute"
@@ -45,7 +45,8 @@
             android:padding="6dp"
             android:scaleType="center"
             android:src="@drawable/ic_volume_off"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <LinearLayout
             android:id="@+id/video_progress_panel"
@@ -56,7 +57,8 @@
             android:orientation="horizontal"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            tools:visibility="visible">
 
             <ProgressBar
                 android:id="@+id/video_progress"
@@ -88,7 +90,8 @@
         android:layout_marginTop="12dp"
         android:textColor="#6D6D6D"
         android:textSize="12sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        tools:text="VoltBike" />
 
     <TextView
         android:id="@+id/ad_title"
@@ -97,7 +100,8 @@
         android:layout_marginTop="4dp"
         android:textColor="#151515"
         android:textSize="20sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        tools:text="城市短途骑行体验" />
 
     <TextView
         android:id="@+id/ad_summary"
@@ -106,7 +110,8 @@
         android:layout_marginTop="8dp"
         android:lineSpacingExtra="2dp"
         android:textColor="#454545"
-        android:textSize="14sp" />
+        android:textSize="14sp"
+        tools:text="短视频广告展示城市骑行路线和低碳通勤方案。" />
 
     <TextView
         android:id="@+id/ad_tags"
@@ -114,7 +119,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:textColor="#1F7A68"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        tools:text="#骑行  #低碳  #通勤" />
 
     <TextView
         android:id="@+id/ad_stats"
@@ -122,7 +128,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:textColor="#777777"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        tools:text="曝光 39 · 点击 7" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -133,16 +140,19 @@
 
         <TextView
             android:id="@+id/action_like"
-            style="@style/AdActionButton" />
+            style="@style/AdActionButton"
+            tools:text="点赞 8" />
 
         <TextView
             android:id="@+id/action_favorite"
             style="@style/AdActionButton"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="6dp"
+            tools:text="收藏" />
 
         <TextView
             android:id="@+id/action_share"
             style="@style/AdActionButton"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="6dp"
+            tools:text="分享" />
     </LinearLayout>
 </LinearLayout>

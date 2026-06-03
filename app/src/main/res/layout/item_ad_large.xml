@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="14dp"
@@ -10,7 +11,8 @@
     <View
         android:id="@+id/ad_media"
         android:layout_width="match_parent"
-        android:layout_height="190dp" />
+        android:layout_height="190dp"
+        tools:background="#75CDB5" />
 
     <TextView
         android:id="@+id/ad_brand"
@@ -19,7 +21,8 @@
         android:layout_marginTop="12dp"
         android:textColor="#6D6D6D"
         android:textSize="12sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        tools:text="PulseRun" />
 
     <TextView
         android:id="@+id/ad_title"
@@ -28,7 +31,8 @@
         android:layout_marginTop="4dp"
         android:textColor="#151515"
         android:textSize="20sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        tools:text="城市夜跑能量补给" />
 
     <TextView
         android:id="@+id/ad_summary"
@@ -37,7 +41,8 @@
         android:layout_marginTop="8dp"
         android:lineSpacingExtra="2dp"
         android:textColor="#454545"
-        android:textSize="14sp" />
+        android:textSize="14sp"
+        tools:text="适合年轻人的轻量运动装备组合，覆盖夜跑、通勤和日常训练场景。" />
 
     <TextView
         android:id="@+id/ad_tags"
@@ -45,7 +50,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:textColor="#1F7A68"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        tools:text="#运动  #夜跑  #年轻人" />
 
     <TextView
         android:id="@+id/ad_stats"
@@ -53,7 +59,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:textColor="#777777"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        tools:text="曝光 42 · 点击 8" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -64,16 +71,19 @@
 
         <TextView
             android:id="@+id/action_like"
-            style="@style/AdActionButton" />
+            style="@style/AdActionButton"
+            tools:text="点赞 12" />
 
         <TextView
             android:id="@+id/action_favorite"
             style="@style/AdActionButton"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="6dp"
+            tools:text="收藏" />
 
         <TextView
             android:id="@+id/action_share"
             style="@style/AdActionButton"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="6dp"
+            tools:text="分享 3" />
     </LinearLayout>
 </LinearLayout>
