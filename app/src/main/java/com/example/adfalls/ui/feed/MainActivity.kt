@@ -415,10 +415,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openAiChatPage() {
-        startActivity(
-            Intent(this, AiChatActivity::class.java)
-                .putExtra(AiChatActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
-        )
+        startActivity(Intent(this, AiChatActivity::class.java))
     }
 
     companion object {

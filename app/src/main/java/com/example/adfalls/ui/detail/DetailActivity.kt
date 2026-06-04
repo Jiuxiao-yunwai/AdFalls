@@ -1,5 +1,6 @@
 package com.example.adfalls.ui.detail
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -21,6 +22,7 @@ import com.example.adfalls.R
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.ui.aichat.AiChatActivity
 import com.example.adfalls.viewmodel.DetailUiState
 import com.example.adfalls.viewmodel.DetailViewModel
 import kotlinx.coroutines.launch
@@ -159,6 +161,16 @@ class DetailActivity : ComponentActivity() {
         like.setOnClickListener { viewModel.toggleLike() }
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
+        findViewById<View>(R.id.detail_ask_ai).setOnClickListener {
+            startActivity(
+                Intent(this, AiChatActivity::class.java)
+                    .putExtra(
+                        AiChatActivity.EXTRA_INITIAL_QUERY,
+                        "请分析一下这条广告适合什么人，以及它的核心卖点：${ad.title}"
+                    )
+                    .putExtra(AiChatActivity.EXTRA_CONTEXT_AD_ID, ad.id)
+            )
+        }
         mediaContainer.setOnClickListener {
             val currentAd = lastRenderedAd ?: ad
             if (currentAd.type == AdCardType.VIDEO) {

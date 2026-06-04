@@ -166,6 +166,18 @@
             android:textSize="13sp"
             tools:text="曝光 42 · 点击 8 · 分享 3" />
 
+        <TextView
+            android:id="@+id/detail_ask_ai"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_dark_button"
+            android:gravity="center"
+            android:text="@string/detail_ask_ai"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="44dp"

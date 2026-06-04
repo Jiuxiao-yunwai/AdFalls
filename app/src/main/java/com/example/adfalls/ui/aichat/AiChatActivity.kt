@@ -1,5 +1,6 @@
 package com.example.adfalls.ui.aichat
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
@@ -15,7 +16,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
-import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.viewmodel.AiChatViewModel
 import kotlinx.coroutines.launch
 
@@ -25,6 +26,7 @@ class AiChatActivity : ComponentActivity() {
     private lateinit var messageList: RecyclerView
     private lateinit var input: EditText
     private lateinit var sendButton: TextView
+    private var initialQuerySubmitted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,14 +34,15 @@ class AiChatActivity : ComponentActivity() {
         window.navigationBarColor = Color.BLACK
         setContentView(R.layout.activity_ai_chat)
 
-        val channel = intent.getStringExtra(EXTRA_CHANNEL)
-            ?.let { runCatching { AdChannel.valueOf(it) }.getOrNull() }
-            ?: AdChannel.FEATURED
-
         viewModel = ViewModelProvider.create(this)[AiChatViewModel::class]
-        viewModel.selectChannel(channel)
 
-        adapter = AiChatAdapter()
+        adapter = AiChatAdapter { adId ->
+            viewModel.registerAdClick(adId)
+            startActivity(
+                Intent(this, DetailActivity::class.java)
+                    .putExtra(DetailActivity.EXTRA_AD_ID, adId)
+            )
+        }
         messageList = findViewById<RecyclerView>(R.id.ai_chat_messages).apply {
             layoutManager = LinearLayoutManager(this@AiChatActivity)
             adapter = this@AiChatActivity.adapter
@@ -48,7 +51,6 @@ class AiChatActivity : ComponentActivity() {
         sendButton = findViewById(R.id.ai_chat_send)
 
         findViewById<TextView>(R.id.ai_chat_back).setOnClickListener { finish() }
-        findViewById<TextView>(R.id.ai_chat_scope).text = "当前频道：${channel.title}"
         sendButton.setOnClickListener { viewModel.sendMessage() }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -80,14 +82,33 @@ class AiChatActivity : ComponentActivity() {
                         input.setText(state.inputText)
                         input.setSelection(input.text.length)
                     }
-                    sendButton.isEnabled = !state.sending && state.inputText.isNotBlank()
+                    sendButton.isEnabled = state.historyLoaded && !state.sending && state.inputText.isNotBlank()
                     sendButton.alpha = if (sendButton.isEnabled) 1f else 0.45f
                 }
             }
         }
+
+        initialQuerySubmitted = savedInstanceState?.getBoolean(STATE_INITIAL_QUERY_SUBMITTED) == true
+        if (!initialQuerySubmitted) {
+            val initialQuery = intent.getStringExtra(EXTRA_INITIAL_QUERY).orEmpty()
+            if (initialQuery.isNotBlank()) {
+                initialQuerySubmitted = true
+                viewModel.submitInitialQueryOnce(
+                    query = initialQuery,
+                    contextAdId = intent.getLongExtra(EXTRA_CONTEXT_AD_ID, -1L).takeIf { it > 0L }
+                )
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_INITIAL_QUERY_SUBMITTED, initialQuerySubmitted)
+        super.onSaveInstanceState(outState)
     }
 
     companion object {
-        const val EXTRA_CHANNEL = "extra_channel"
+        const val EXTRA_INITIAL_QUERY = "extra_initial_query"
+        const val EXTRA_CONTEXT_AD_ID = "extra_context_ad_id"
+        private const val STATE_INITIAL_QUERY_SUBMITTED = "state_initial_query_submitted"
     }
 }

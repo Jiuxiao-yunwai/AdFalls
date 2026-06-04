@@ -45,9 +45,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:text="@string/ai_chat_scope_all"
         android:textColor="#9A9A9A"
         android:textSize="12sp"
-        tools:text="当前频道：精选" />
+        tools:text="全域广告搜索 · AI 自动识别需求维度" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/ai_chat_messages"
