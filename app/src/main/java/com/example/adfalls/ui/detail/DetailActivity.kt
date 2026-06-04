@@ -1,11 +1,14 @@
 package com.example.adfalls.ui.detail
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -19,12 +22,14 @@ import com.example.adfalls.R
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.ui.aichat.AiChatActivity
 import com.example.adfalls.viewmodel.DetailUiState
 import com.example.adfalls.viewmodel.DetailViewModel
 import kotlinx.coroutines.launch
 
 class DetailActivity : ComponentActivity() {
     private lateinit var viewModel: DetailViewModel
+    private lateinit var mediaContainer: FrameLayout
     private lateinit var playerView: PlayerView
     private val progressHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
@@ -40,7 +45,16 @@ class DetailActivity : ComponentActivity() {
         setContentView(R.layout.activity_detail)
         viewModel = ViewModelProvider.create(this)[DetailViewModel::class]
         viewModel.loadAd(intent.getLongExtra(EXTRA_AD_ID, -1L))
-        playerView = findViewById(R.id.detail_media)
+        mediaContainer = findViewById(R.id.detail_media)
+        playerView = PlayerView(this).apply {
+            useController = false
+            useArtwork = false
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        mediaContainer.addView(playerView, 0)
 
         findViewById<View>(R.id.back_button).setOnClickListener { finish() }
 
@@ -89,13 +103,14 @@ class DetailActivity : ComponentActivity() {
         findViewById<TextView>(R.id.detail_stats).text =
             "曝光 ${ad.impressions} · 点击 ${ad.clicks} · 点赞 ${ad.likes} · 分享 ${ad.shares}"
 
-        playerView.background = GradientDrawable(
+        mediaContainer.background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(ad.mediaColor, darken(ad.mediaColor))
         ).apply { cornerRadius = 22f }
         resizeMedia(ad.type)
         playerView.useController = false
         if (ad.type == AdCardType.VIDEO) {
+            playerView.visibility = View.VISIBLE
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
             startProgressUpdates(ad.id)
             findViewById<View>(R.id.detail_mute).apply {
@@ -115,6 +130,7 @@ class DetailActivity : ComponentActivity() {
                 showPlaybackControls(scheduleHide = true)
             }
         } else {
+            playerView.visibility = View.GONE
             stopProgressUpdates()
             keepControlsVisibleOnNextRender = false
             hidePlaybackControls(animate = false)
@@ -145,6 +161,22 @@ class DetailActivity : ComponentActivity() {
         like.setOnClickListener { viewModel.toggleLike() }
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
+        findViewById<View>(R.id.detail_ask_ai).setOnClickListener {
+            startActivity(
+                Intent(this, AiChatActivity::class.java)
+                    .putExtra(
+                        AiChatActivity.EXTRA_INITIAL_QUERY,
+                        "请分析一下这条广告适合什么人，以及它的核心卖点：${ad.title}"
+                    )
+                    .putExtra(AiChatActivity.EXTRA_CONTEXT_AD_ID, ad.id)
+            )
+        }
+        mediaContainer.setOnClickListener {
+            val currentAd = lastRenderedAd ?: ad
+            if (currentAd.type == AdCardType.VIDEO) {
+                toggleVideoFromUser(currentAd)
+            }
+        }
         playerView.setOnClickListener {
             val currentAd = lastRenderedAd ?: ad
             if (currentAd.type == AdCardType.VIDEO) {

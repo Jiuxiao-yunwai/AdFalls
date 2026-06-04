@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="14dp"
@@ -10,7 +11,8 @@
     <View
         android:id="@+id/ad_media"
         android:layout_width="116dp"
-        android:layout_height="128dp" />
+        android:layout_height="128dp"
+        tools:background="#75CDB5" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -25,7 +27,8 @@
             android:layout_height="wrap_content"
             android:textColor="#6D6D6D"
             android:textSize="12sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="PixelBox" />
 
         <TextView
             android:id="@+id/ad_title"
@@ -35,7 +38,8 @@
             android:maxLines="2"
             android:textColor="#151515"
             android:textSize="17sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="学生党数码精简包" />
 
         <TextView
             android:id="@+id/ad_summary"
@@ -44,7 +48,8 @@
             android:layout_marginTop="6dp"
             android:maxLines="2"
             android:textColor="#454545"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            tools:text="高性价比数码配件组合，适合校园通勤和学习场景。" />
 
         <TextView
             android:id="@+id/ad_tags"
@@ -53,7 +58,8 @@
             android:layout_marginTop="6dp"
             android:maxLines="1"
             android:textColor="#1F7A68"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            tools:text="#数码  #学生  #性价比" />
 
         <TextView
             android:id="@+id/ad_stats"
@@ -61,7 +67,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:textColor="#777777"
-            android:textSize="11sp" />
+            android:textSize="11sp"
+            tools:text="曝光 47 · 点击 9" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -72,17 +79,20 @@
 
             <TextView
                 android:id="@+id/action_like"
-                style="@style/AdActionButtonSmall" />
+                style="@style/AdActionButtonSmall"
+                tools:text="点赞" />
 
             <TextView
                 android:id="@+id/action_favorite"
                 style="@style/AdActionButtonSmall"
-                android:layout_marginStart="6dp" />
+                android:layout_marginStart="6dp"
+                tools:text="收藏" />
 
             <TextView
                 android:id="@+id/action_share"
                 style="@style/AdActionButtonSmall"
-                android:layout_marginStart="6dp" />
+                android:layout_marginStart="6dp"
+                tools:text="分享" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

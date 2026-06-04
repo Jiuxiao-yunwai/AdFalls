@@ -21,6 +21,7 @@ import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.ui.aichat.AiChatActivity
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
             tab.setOnClickListener { selectTab(AdChannel.entries[index]) }
         }
         tabIndicator = findViewById(R.id.tab_indicator)
+        findViewById<View>(R.id.ai_chat_button).setOnClickListener { openAiChatPage() }
         findViewById<View>(R.id.search_button).setOnClickListener { openSearchPage() }
         tagFilterBar = findViewById(R.id.tag_filter_bar)
         tagFilterText = findViewById(R.id.tag_filter_text)
@@ -410,6 +412,10 @@ class MainActivity : ComponentActivity() {
             Intent(this, SearchActivity::class.java)
                 .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
         )
+    }
+
+    private fun openAiChatPage() {
+        startActivity(Intent(this, AiChatActivity::class.java))
     }
 
     companion object {

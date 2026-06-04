@@ -2,7 +2,6 @@
 <resources>
 
     <style name="Theme.AdFalls" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>

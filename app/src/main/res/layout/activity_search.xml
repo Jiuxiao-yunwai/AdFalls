@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#050505"
@@ -50,7 +51,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:textColor="#9A9A9A"
-        android:textSize="12sp" />
+        android:textSize="12sp"
+        tools:text="当前频道：精选 · 可搜索标题、品牌、摘要和标签" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -63,7 +65,9 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingBottom="22dp" />
+            android:paddingBottom="22dp"
+            tools:itemCount="3"
+            tools:listitem="@layout/item_ad_small" />
 
         <TextView
             android:id="@+id/search_empty_state"

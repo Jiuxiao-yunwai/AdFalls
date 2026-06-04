@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">AdFalls</string>
+    <string name="detail_ask_ai">让 AI 分析这个广告</string>
+    <string name="chat_recommendation_title">推荐广告</string>
+    <string name="chat_recommendation_subtitle">AI 为你找到了相关广告</string>
+    <string name="chat_recommendation_empty">推荐广告暂时不可用</string>
+    <string name="chat_ad_link_open">查看详情 →</string>
+    <string name="ai_chat_scope_all">全域广告搜索 · AI 自动识别需求维度</string>
 </resources>

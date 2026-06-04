@@ -86,6 +86,13 @@ object AdRepository {
         dao().getAdById(id)?.toModel()
     }
 
+    suspend fun findAds(ids: List<Long>): List<AdItem> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        seedIfNeeded()
+        val adsById = dao().getAdsByIds(ids.distinct()).associate { it.id to it.toModel() }
+        ids.mapNotNull(adsById::get)
+    }
+
     suspend fun searchAds(channel: AdChannel, query: String): List<AdItem> = withContext(Dispatchers.IO) {
         seedIfNeeded()
         FakeAdRemoteDataSource.searchAds(
