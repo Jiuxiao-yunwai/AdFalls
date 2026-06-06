@@ -11,6 +11,7 @@
     <color name="app_bg">#050505</color>
     <color name="app_bg_mid">#07130F</color>
     <color name="app_bg_deep">#020303</color>
+    <color name="app_frame">#0D1310</color>
     <color name="app_surface_dark">#111513</color>
     <color name="app_surface_elevated">#151C19</color>
     <color name="app_surface_dark_pressed">#222A26</color>

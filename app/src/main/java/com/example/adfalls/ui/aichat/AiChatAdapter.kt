@@ -1,5 +1,7 @@
 package com.example.adfalls.ui.aichat
 
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -39,6 +41,21 @@ class AiChatAdapter(
         holder.bind(getItem(position))
     }
 
+    override fun onViewRecycled(holder: ChatViewHolder) {
+        holder.stopLoadingAnimation()
+        super.onViewRecycled(holder)
+    }
+
+    override fun onViewDetachedFromWindow(holder: ChatViewHolder) {
+        holder.stopLoadingAnimation()
+        super.onViewDetachedFromWindow(holder)
+    }
+
+    override fun onViewAttachedToWindow(holder: ChatViewHolder) {
+        super.onViewAttachedToWindow(holder)
+        holder.restartLoadingAnimationIfNeeded()
+    }
+
     class ChatViewHolder(
         itemView: View,
         private val onAdRecommendationClick: (Long) -> Unit
@@ -47,8 +64,21 @@ class AiChatAdapter(
         private val recommendationCard: View? = itemView.findViewById(R.id.chat_recommendation_card)
         private val recommendationLinks: LinearLayout? = itemView.findViewById(R.id.chat_recommendation_links)
         private val recommendationEmpty: TextView? = itemView.findViewById(R.id.chat_recommendation_empty)
+        private val loadingHandler = Handler(Looper.getMainLooper())
+        private var loadingBaseText = LOADING_TEXT_BASE
+        private var loadingDotCount = 0
+        private var currentRole: ChatRole? = null
+        private val loadingRunnable = object : Runnable {
+            override fun run() {
+                messageText.text = loadingBaseText + ".".repeat(loadingDotCount)
+                loadingDotCount = (loadingDotCount + 1) % (LOADING_MAX_DOTS + 1)
+                loadingHandler.postDelayed(this, LOADING_DOT_INTERVAL_MS)
+            }
+        }
 
         fun bind(message: AiChatMessage) {
+            stopLoadingAnimation()
+            currentRole = message.role
             messageText.text = message.text
             applyTrackRelativeWidth()
             when (message.role) {
@@ -71,6 +101,7 @@ class AiChatAdapter(
                 ChatRole.LOADING -> {
                     messageText.setTextColor(itemView.context.getColor(R.color.app_text_on_dark_secondary))
                     messageText.setBackgroundResource(R.drawable.bg_chat_assistant_bubble)
+                    startLoadingAnimation(message.text)
                 }
             }
 
@@ -88,6 +119,23 @@ class AiChatAdapter(
                 link.setOnClickListener { onAdRecommendationClick(ad.id) }
                 recommendationLinks?.addView(link)
             }
+        }
+
+        fun stopLoadingAnimation() {
+            loadingHandler.removeCallbacks(loadingRunnable)
+        }
+
+        fun restartLoadingAnimationIfNeeded() {
+            if (currentRole == ChatRole.LOADING) {
+                stopLoadingAnimation()
+                loadingRunnable.run()
+            }
+        }
+
+        private fun startLoadingAnimation(text: String) {
+            loadingBaseText = text.trim().trimEnd('.').ifBlank { LOADING_TEXT_BASE }
+            loadingDotCount = 0
+            loadingRunnable.run()
         }
 
         private fun applyTrackRelativeWidth() {
@@ -115,5 +163,8 @@ class AiChatAdapter(
     private companion object {
         private const val MESSAGE_MAX_TRACK_FRACTION = 0.8f
         private const val RECOMMENDATION_CARD_TRACK_FRACTION = 0.9f
+        private const val LOADING_TEXT_BASE = "正在思考"
+        private const val LOADING_MAX_DOTS = 3
+        private const val LOADING_DOT_INTERVAL_MS = 420L
     }
 }

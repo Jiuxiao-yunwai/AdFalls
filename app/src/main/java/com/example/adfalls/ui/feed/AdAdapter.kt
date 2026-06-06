@@ -4,6 +4,11 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -103,20 +108,7 @@ class AdAdapter(
         private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
         private val progress: ProgressBar? = itemView.findViewById(R.id.video_progress)
         private val time: TextView? = itemView.findViewById(R.id.video_time)
-        private val _playerView: PlayerView? by lazy {
-            if (itemView.isInEditMode) return@lazy null
-            (media as? ViewGroup)?.let { container ->
-                PlayerView(itemView.context).apply {
-                    useController = false
-                    useArtwork = false
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    container.addView(this, 0)
-                }
-            }
-        }
+        private var playerView: PlayerView? = null
         private var boundAd: AdItem? = null
         private val progressHandler = Handler(Looper.getMainLooper())
         private var progressRunnable: Runnable? = null
@@ -131,7 +123,7 @@ class AdAdapter(
             title.text = ad.title
             brand.text = ad.brand
             summary.text = ad.summary
-            tags.text = ad.tags.joinToString("  ") { "#$it" }
+            bindTags(ad.tags)
             stats?.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
             like.text = ad.likes.toString()
             favorite?.text = if (ad.favorited) "已存" else "收藏"
@@ -154,9 +146,13 @@ class AdAdapter(
 
             resizeMedia(ad.type)
             media.background = mediaBackground(ad.mediaColor, ad.type, itemView.resources.displayMetrics.density)
-            _playerView?.useController = false
-            _playerView?.let {
-                VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+            if (ad.type == AdCardType.VIDEO) {
+                ensurePlayerView()?.let {
+                    it.useController = false
+                    VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+                }
+            } else {
+                playerView?.let(VideoPlaybackPool::detach)
             }
             like.isSelected = ad.liked
             favorite?.isSelected = ad.favorited
@@ -174,7 +170,7 @@ class AdAdapter(
                     onCardClick(currentAd)
                 }
             }
-            _playerView?.setOnClickListener {
+            playerView?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
             }
             like.setOnClickListener {
@@ -183,7 +179,6 @@ class AdAdapter(
             }
             favorite?.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
             share?.setOnClickListener { onShareClick(boundAd ?: ad) }
-            tags.setOnClickListener { (boundAd ?: ad).tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
             }
@@ -194,13 +189,51 @@ class AdAdapter(
             }
         }
 
+        private fun bindTags(values: List<String>) {
+            if (values.isEmpty()) {
+                tags.text = ""
+                tags.movementMethod = null
+                tags.setOnClickListener(null)
+                return
+            }
+
+            val builder = SpannableStringBuilder()
+            values.forEachIndexed { index, value ->
+                if (index > 0) builder.append("  ")
+                val start = builder.length
+                builder.append("#").append(value)
+                val end = builder.length
+                builder.setSpan(
+                    object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            onTagClick(value)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            super.updateDrawState(ds)
+                            ds.isUnderlineText = false
+                            ds.color = tags.currentTextColor
+                        }
+                    },
+                    start,
+                    end,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            tags.text = builder
+            tags.linksClickable = true
+            tags.isClickable = true
+            tags.highlightColor = Color.TRANSPARENT
+            tags.movementMethod = LinkMovementMethod.getInstance()
+        }
+
         fun detachVideo() {
             stopProgressUpdates()
             stopPendingControlHide()
-            _playerView?.let(VideoPlaybackPool::detach)
+            playerView?.let(VideoPlaybackPool::detach)
         }
 
-        fun getPlayerView(): PlayerView? = _playerView
+        fun getPlayerView(): PlayerView? = playerView
 
         fun getBoundAd(): AdItem? = boundAd
 
@@ -237,6 +270,23 @@ class AdAdapter(
             video?.contentDescription = if (ad.playing) "播放" else "暂停"
             showPlaybackControls(scheduleHide = true)
             onVideoClick(ad)
+        }
+
+        private fun ensurePlayerView(): PlayerView? {
+            if (itemView.isInEditMode) return null
+            val existing = playerView
+            if (existing != null) return existing
+            val container = media as? ViewGroup ?: return null
+            return PlayerView(itemView.context).apply {
+                useController = false
+                useArtwork = false
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                container.addView(this, 0)
+                playerView = this
+            }
         }
 
         private fun startProgressUpdates(adId: Long) {

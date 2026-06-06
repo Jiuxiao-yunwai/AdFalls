@@ -23,7 +23,14 @@ data class FeedUiState(
     val selectedTag: String? = null,
     val ads: List<AdItem> = emptyList(),
     val loadingMore: Boolean = false,
-    val endReached: Boolean = false
+    val endReached: Boolean = false,
+    val refreshVersion: Int = 0
+)
+
+private data class FeedStatus(
+    val loadingMore: Boolean,
+    val endReached: Boolean,
+    val refreshVersion: Int
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -33,27 +40,32 @@ class FeedViewModel : ViewModel() {
     private val selectedTag = MutableStateFlow<String?>(null)
     private val loadingMore = MutableStateFlow(false)
     private val endReached = MutableStateFlow(false)
+    private val refreshVersion = MutableStateFlow(0)
     private val manuallyPausedVideoIds = mutableSetOf<Long>()
 
     private val channelAds = activeChannel.flatMapLatest { channel ->
         AdRepository.observeAdsByChannel(channel).map { ads -> channel to ads }
     }
 
+    private val feedStatus = combine(loadingMore, endReached, refreshVersion) { loading, reached, version ->
+        FeedStatus(loadingMore = loading, endReached = reached, refreshVersion = version)
+    }
+
     val uiState: StateFlow<FeedUiState> = combine(
         searchText,
         selectedTag,
         channelAds,
-        loadingMore,
-        endReached
-    ) { query, tag, channelAndAds, loading, reached ->
+        feedStatus
+    ) { query, tag, channelAndAds, status ->
         val (channel, ads) = channelAndAds
         FeedUiState(
             activeChannel = channel,
             searchText = query,
             selectedTag = tag,
             ads = filterAds(ads, query, tag),
-            loadingMore = loading,
-            endReached = query.isBlank() && tag == null && reached
+            loadingMore = status.loadingMore,
+            endReached = query.isBlank() && tag == null && status.endReached,
+            refreshVersion = status.refreshVersion
         )
     }.stateIn(
         scope = viewModelScope,
@@ -83,10 +95,11 @@ class FeedViewModel : ViewModel() {
         endReached.value = false
     }
 
-    fun refresh() {
+    fun refresh(channel: AdChannel = activeChannel.value) {
         viewModelScope.launch {
-            AdRepository.refresh(activeChannel.value)
+            AdRepository.refresh(channel)
             endReached.value = false
+            refreshVersion.value += 1
         }
     }
 

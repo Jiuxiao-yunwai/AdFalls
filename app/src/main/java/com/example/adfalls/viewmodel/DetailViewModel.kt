@@ -42,6 +42,7 @@ class DetailViewModel : ViewModel() {
 
     fun loadAd(adId: Long) {
         this.adId.value = adId
+        viewModelScope.launch { AdRepository.refreshAdDetail(adId) }
     }
 
     fun toggleLike() {

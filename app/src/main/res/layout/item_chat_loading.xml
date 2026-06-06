@@ -14,6 +14,7 @@
         android:includeFontPadding="false"
         android:lineSpacingExtra="2dp"
         android:minHeight="44dp"
+        android:minWidth="104dp"
         android:paddingStart="14dp"
         android:paddingTop="11dp"
         android:paddingEnd="14dp"

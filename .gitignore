@@ -11,3 +11,10 @@ AdFalls-main.zip
 .externalNativeBuild
 .cxx
 local.properties
+.venv/
+__pycache__/
+*.py[cod]
+adfalls.db
+debug.keystore
+.gradle-user-home/
+backend/.env
