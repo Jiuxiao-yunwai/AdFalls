@@ -7,7 +7,7 @@ object AiChatRemoteDataSource {
         request: AiChatRequestDto
     ): AiChatResponseDto {
         delay(800)
-        request.contextAd?.let { return analyzeAd(it) }
+        request.contextAd?.let { return introduceAd(it) }
         val recommendedAdIds = recommendAdIds(request.query)
 
         // TODO: Replace this fake response with an OkHttp POST request to /api/ai-search/chat.
@@ -32,17 +32,8 @@ object AiChatRemoteDataSource {
         )
     }
 
-    private fun analyzeAd(ad: AiChatAdContextDto): AiChatResponseDto {
+    private fun introduceAd(ad: AiChatAdContextDto): AiChatResponseDto {
         val primaryTags = ad.tags.take(3).joinToString("、").ifBlank { "当前广告主题" }
-        val audience = when {
-            ad.tags.any { it in listOf("学生", "教育", "性价比") } -> "学生、年轻用户和重视性价比的人群"
-            ad.tags.any { it in listOf("通勤", "办公", "效率") } -> "城市通勤者和希望提升日常效率的职场人群"
-            ad.tags.any { it in listOf("运动", "健身", "跑步", "骑行", "户外") } ->
-                "关注运动体验、健康生活和户外场景的人群"
-            ad.tags.any { it in listOf("餐饮", "咖啡", "轻食", "火锅", "本地") } ->
-                "附近有消费需求、喜欢探店和本地生活服务的人群"
-            else -> "对${primaryTags}感兴趣，并愿意尝试相关产品或服务的人群"
-        }
         val positioning = if (ad.summary.isNotBlank()) {
             ad.summary
         } else {
@@ -53,15 +44,15 @@ object AiChatRemoteDataSource {
             messages = listOf(
                 AiChatMessageDto(
                     type = "text",
-                    content = "这条广告的核心定位是“${ad.title}”，由 ${ad.brand} 发布，重点围绕${primaryTags}展开。"
+                    content = "${ad.title} 是 ${ad.brand} 带来的一个围绕${primaryTags}展开的产品或服务。简单说，它想帮你在具体生活场景里更省心地完成相关需求。"
                 ),
                 AiChatMessageDto(
                     type = "text",
-                    content = "适合人群：$audience。它通过“$positioning”来建立吸引力。"
+                    content = "它的主要亮点是：$positioning 如果你正在寻找和${primaryTags}有关的选择，可以重点关注它提供的便利性、体验感和使用场景。"
                 ),
                 AiChatMessageDto(
                     type = "text",
-                    content = "从投放角度看，可以继续强化具体使用场景、差异化卖点和明确行动指引，让用户更快判断是否适合自己。"
+                    content = "使用上可以把它理解成一个面向日常场景的解决方案：先看它是否匹配你的当前需求，再比较它的价格、服务范围或产品细节，判断是否值得进一步了解。"
                 )
             )
         )

@@ -101,7 +101,7 @@ class DetailActivity : ComponentActivity() {
         findViewById<TextView>(R.id.detail_body).text = ad.detail
         findViewById<TextView>(R.id.detail_tags).text = ad.tags.joinToString("  ") { "#$it" }
         findViewById<TextView>(R.id.detail_stats).text =
-            "曝光 ${ad.impressions} · 点击 ${ad.clicks} · 点赞 ${ad.likes} · 分享 ${ad.shares}"
+            "点赞 ${ad.likes} · 收藏 ${if (ad.favorited) 1 else 0}"
 
         mediaContainer.background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
@@ -168,7 +168,15 @@ class DetailActivity : ComponentActivity() {
                 Intent(this, AiChatActivity::class.java)
                     .putExtra(
                         AiChatActivity.EXTRA_INITIAL_QUERY,
-                        "请分析一下这条广告适合什么人，以及它的核心卖点：${ad.title}"
+                        "向我介绍：${ad.title}"
+                    )
+                    .putExtra(
+                        AiChatActivity.EXTRA_INITIAL_AI_PROMPT,
+                        "你是一个广告推荐助手，现在你要以一个助手的身份，向用户介绍这个产品。" +
+                            "请只根据当前广告信息，面向普通用户简短介绍这个产品。" +
+                            "直接说明它是什么、主要用途和一两个亮点即可。" +
+                            "不要写开场白，不要分析广告投放，不要评价或改写文案，不要提出优化建议，也不要说“文案可以更生动一点”等类似内容。" +
+                            "产品标题：${ad.title}"
                     )
                     .putExtra(AiChatActivity.EXTRA_CONTEXT_AD_ID, ad.id)
             )

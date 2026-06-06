@@ -204,7 +204,7 @@
                 android:layout_marginTop="14dp"
                 android:textColor="@color/app_text_tertiary"
                 android:textSize="13sp"
-                tools:text="曝光 42 · 点击 8 · 分享 3" />
+                tools:text="点赞 42 · 收藏 8" />
 
             <TextView
                 android:id="@+id/detail_ask_ai"

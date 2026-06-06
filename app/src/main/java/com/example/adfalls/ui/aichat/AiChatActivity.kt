@@ -96,6 +96,7 @@ class AiChatActivity : ComponentActivity() {
                 initialQuerySubmitted = true
                 viewModel.submitInitialQueryOnce(
                     query = initialQuery,
+                    aiPrompt = intent.getStringExtra(EXTRA_INITIAL_AI_PROMPT),
                     contextAdId = intent.getLongExtra(EXTRA_CONTEXT_AD_ID, -1L).takeIf { it > 0L }
                 )
             }
@@ -109,6 +110,7 @@ class AiChatActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_INITIAL_QUERY = "extra_initial_query"
+        const val EXTRA_INITIAL_AI_PROMPT = "extra_initial_ai_prompt"
         const val EXTRA_CONTEXT_AD_ID = "extra_context_ad_id"
         private const val STATE_INITIAL_QUERY_SUBMITTED = "state_initial_query_submitted"
         private const val AI_CHAT_SIDE_PERCENT = 0.14f
