@@ -4,7 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Parcelable
-import android.view.GestureDetector
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -21,12 +21,12 @@ import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
 import com.example.adfalls.ui.aichat.AiChatActivity
-import com.example.adfalls.ui.common.applyResponsiveHorizontalPadding
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
 import com.example.adfalls.viewmodel.FeedViewModel
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -43,7 +43,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var adapter: AdAdapter
     private lateinit var outgoingAdapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
-    private lateinit var swipeDetector: GestureDetector
     private val listStates = mutableMapOf<AdChannel, Parcelable?>()
     private var pendingListCommitChannel: AdChannel? = null
     private var pendingListCommit: (() -> Unit)? = null
@@ -55,17 +54,17 @@ class MainActivity : ComponentActivity() {
     private var handledRefreshVersion = 0
     private var pageSwitchInProgress = false
     private var refreshFadePending = false
+    private var nextPageSwitchAllowedAt = 0L
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var horizontalSwipeActive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = getColor(R.color.app_bg)
         window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_main)
-        findViewById<View>(R.id.main_root).applyResponsiveHorizontalPadding(
-            percent = 0.04f,
-            minDp = 12f,
-            maxDp = 22f
-        )
+        findViewById<View>(R.id.main_root).applyMainResponsiveHorizontalPadding()
         viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
 
         tabs = listOf(
@@ -100,30 +99,8 @@ class MainActivity : ComponentActivity() {
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
         configureRecyclerViewForFeed(recyclerView)
-        swipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent): Boolean = true
-
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                val start = e1 ?: return false
-                val dx = e2.x - start.x
-                val dy = e2.y - start.y
-                if (abs(dx) < SWIPE_DISTANCE || abs(dx) < abs(dy) * 1.25f || abs(velocityX) < SWIPE_VELOCITY) {
-                    return false
-                }
-                val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
-                val nextIndex = if (dx < 0) currentIndex + 1 else currentIndex - 1
-                if (nextIndex !in AdChannel.entries.indices) return false
-                selectTab(AdChannel.entries[nextIndex])
-                return true
-            }
-        })
-        recyclerView.setOnTouchListener { _, event ->
-            swipeDetector.onTouchEvent(event)
+        recyclerView.setOnTouchListener { view, event ->
+            handleFeedSwipeTouch(view, event)
             false
         }
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -201,6 +178,8 @@ class MainActivity : ComponentActivity() {
         val currentChannel = viewModel.uiState.value.activeChannel
         if (restorePosition && channel == currentChannel) return
         if (pageSwitchInProgress) return
+        val now = SystemClock.elapsedRealtime()
+        if (restorePosition && now < nextPageSwitchAllowedAt) return
         if (::layoutManager.isInitialized) {
             listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
@@ -258,6 +237,55 @@ class MainActivity : ComponentActivity() {
         target.setHasFixedSize(true)
         target.setItemViewCacheSize(FEED_ITEM_CACHE_SIZE)
         target.itemAnimator = null
+    }
+
+    private fun handleFeedSwipeTouch(view: View, event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDownX = event.x
+                touchDownY = event.y
+                horizontalSwipeActive = false
+                swipeRefresh.isEnabled = true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (horizontalSwipeActive || isHorizontalSwipeIntent(event)) {
+                    horizontalSwipeActive = true
+                    swipeRefresh.isEnabled = false
+                    view.parent.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (horizontalSwipeActive) {
+                    switchChannelForSwipe(event.x - touchDownX)
+                }
+                horizontalSwipeActive = false
+                swipeRefresh.isEnabled = true
+                view.parent.requestDisallowInterceptTouchEvent(false)
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                horizontalSwipeActive = false
+                swipeRefresh.isEnabled = true
+                view.parent.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+    }
+
+    private fun isHorizontalSwipeIntent(event: MotionEvent): Boolean {
+        val dx = event.x - touchDownX
+        val dy = event.y - touchDownY
+        return abs(dx) >= SWIPE_DISTANCE * SWIPE_INTENT_DISTANCE_RATIO &&
+            abs(dx) > abs(dy) * SWIPE_DIRECTION_RATIO
+    }
+
+    private fun switchChannelForSwipe(dx: Float) {
+        if (abs(dx) < SWIPE_DISTANCE) return
+        val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
+        val nextIndex = if (dx < 0) currentIndex + 1 else currentIndex - 1
+        if (nextIndex !in AdChannel.entries.indices) return
+        selectTab(AdChannel.entries[nextIndex])
     }
 
     private fun scrollToTopAfterRefreshIfNeeded(state: FeedUiState) {
@@ -460,12 +488,14 @@ class MainActivity : ComponentActivity() {
     private fun animatePageSwitch(direction: Int) {
         if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) {
             pageSwitchInProgress = false
+            startPageSwitchCooldown()
             return
         }
         recyclerView.animate().cancel()
         outgoingRecyclerView.animate().cancel()
         if (!outgoingSnapshotReady) {
             pageSwitchInProgress = false
+            startPageSwitchCooldown()
             return
         }
         recyclerView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -490,9 +520,14 @@ class MainActivity : ComponentActivity() {
                 recyclerView.setLayerType(View.LAYER_TYPE_NONE, null)
                 outgoingSnapshotReady = false
                 pageSwitchInProgress = false
+                startPageSwitchCooldown()
                 outgoingAdapter.submitAds(emptyList(), footerText = null)
             }
             .start()
+    }
+
+    private fun startPageSwitchCooldown() {
+        nextPageSwitchAllowedAt = SystemClock.elapsedRealtime() + PAGE_SWITCH_COOLDOWN_MS
     }
 
     private fun offscreenOffset(direction: Int): Float {
@@ -514,9 +549,19 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(this, AiChatActivity::class.java))
     }
 
+    private fun View.applyMainResponsiveHorizontalPadding() {
+        val density = resources.displayMetrics.density
+        val horizontal = (resources.displayMetrics.widthPixels * 0.04f)
+            .roundToInt()
+            .coerceIn((12f * density).roundToInt(), (22f * density).roundToInt())
+        setPaddingRelative(horizontal, paddingTop, horizontal, paddingBottom)
+    }
+
     companion object {
         private const val SWIPE_DISTANCE = 90
-        private const val SWIPE_VELOCITY = 120
+        private const val SWIPE_INTENT_DISTANCE_RATIO = 0.45f
+        private const val SWIPE_DIRECTION_RATIO = 1.25f
+        private const val PAGE_SWITCH_COOLDOWN_MS = 500L
         private const val PAGE_SWITCH_DURATION = 320L
         private const val PAGE_SWITCH_GAP_DP = 10
         private const val FEED_ITEM_CACHE_SIZE = 6

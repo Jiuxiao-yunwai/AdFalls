@@ -29,6 +29,8 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="62dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/bg_header_panel"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -36,13 +38,13 @@
 
                 <ImageButton
                     android:id="@+id/ai_chat_button"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
                     android:background="@drawable/bg_ai_button"
                     android:contentDescription="AI 搜索"
                     android:focusable="true"
-                    android:padding="12dp"
+                    android:padding="10dp"
                     android:scaleType="center"
                     android:src="@drawable/ic_ai_spark" />
 
@@ -105,13 +107,13 @@
 
                 <ImageButton
                     android:id="@+id/search_button"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_dark_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_search_icon_button"
                     android:contentDescription="搜索"
                     android:focusable="true"
-                    android:padding="12dp"
+                    android:padding="10dp"
                     android:src="@drawable/ic_search"
                     android:tint="@color/app_text_on_dark_primary" />
             </LinearLayout>
@@ -141,7 +143,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        <com.example.adfalls.ui.feed.GestureSafeSwipeRefreshLayout
             android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -185,6 +187,6 @@
                     android:textSize="14sp"
                     android:visibility="gone" />
             </FrameLayout>
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        </com.example.adfalls.ui.feed.GestureSafeSwipeRefreshLayout>
     </LinearLayout>
 </LinearLayout>
