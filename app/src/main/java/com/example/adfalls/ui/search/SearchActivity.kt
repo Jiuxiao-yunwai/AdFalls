@@ -2,7 +2,6 @@ package com.example.adfalls.ui.search
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -19,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.ui.common.applyResponsiveHorizontalPadding
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.feed.AdAdapter
 import com.example.adfalls.viewmodel.SearchViewModel
@@ -32,9 +32,10 @@ class SearchActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_search)
+        findViewById<View>(R.id.search_root).applyResponsiveHorizontalPadding()
 
         val channel = intent.getStringExtra(EXTRA_CHANNEL)
             ?.let { runCatching { AdChannel.valueOf(it) }.getOrNull() }
@@ -45,7 +46,7 @@ class SearchActivity : ComponentActivity() {
 
         input = findViewById(R.id.search_input)
         emptyState = findViewById(R.id.search_empty_state)
-        findViewById<TextView>(R.id.search_back).setOnClickListener { finish() }
+        findViewById<View>(R.id.search_back).setOnClickListener { finish() }
         findViewById<TextView>(R.id.search_scope).text = "当前频道：${channel.title} · 可搜索标题、品牌、摘要和标签"
 
         adapter = AdAdapter(

@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ProgressBar
@@ -19,6 +20,7 @@ import com.example.adfalls.R
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import kotlin.math.roundToInt
 
 class AdAdapter(
     private val onCardClick: (AdItem) -> Unit,
@@ -92,10 +94,10 @@ class AdAdapter(
         private val brand: TextView = itemView.findViewById(R.id.ad_brand)
         private val summary: TextView = itemView.findViewById(R.id.ad_summary)
         private val tags: TextView = itemView.findViewById(R.id.ad_tags)
-        private val stats: TextView = itemView.findViewById(R.id.ad_stats)
+        private val stats: TextView? = itemView.findViewById(R.id.ad_stats)
         private val like: TextView = itemView.findViewById(R.id.action_like)
-        private val favorite: TextView = itemView.findViewById(R.id.action_favorite)
-        private val share: TextView = itemView.findViewById(R.id.action_share)
+        private val favorite: TextView? = itemView.findViewById(R.id.action_favorite)
+        private val share: TextView? = itemView.findViewById(R.id.action_share)
         private val video: ImageButton? = itemView.findViewById(R.id.action_video)
         private val mute: ImageButton? = itemView.findViewById(R.id.action_mute)
         private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
@@ -130,10 +132,10 @@ class AdAdapter(
             brand.text = ad.brand
             summary.text = ad.summary
             tags.text = ad.tags.joinToString("  ") { "#$it" }
-            stats.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
-            like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
-            favorite.text = if (ad.favorited) "已收藏" else "收藏"
-            share.text = "分享 ${ad.shares}"
+            stats?.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
+            like.text = ad.likes.toString()
+            favorite?.text = if (ad.favorited) "已存" else "收藏"
+            share?.text = ad.shares.toString()
             video?.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
             mute?.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
             video?.contentDescription = if (ad.playing) "暂停" else "播放"
@@ -151,16 +153,16 @@ class AdAdapter(
             }
 
             resizeMedia(ad.type)
-            media.background = mediaBackground(ad.mediaColor, ad.type)
+            media.background = mediaBackground(ad.mediaColor, ad.type, itemView.resources.displayMetrics.density)
             _playerView?.useController = false
             _playerView?.let {
                 VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
             }
             like.isSelected = ad.liked
-            favorite.isSelected = ad.favorited
+            favorite?.isSelected = ad.favorited
             like.contentDescription = if (ad.liked) "取消点赞" else "点赞"
-            favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
-            share.contentDescription = "分享"
+            favorite?.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
+            share?.contentDescription = "分享"
             tags.contentDescription = "按标签筛选"
 
             itemView.setOnClickListener { onCardClick(boundAd ?: ad) }
@@ -175,9 +177,12 @@ class AdAdapter(
             _playerView?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
             }
-            like.setOnClickListener { onLikeClick(boundAd ?: ad) }
-            favorite.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
-            share.setOnClickListener { onShareClick(boundAd ?: ad) }
+            like.setOnClickListener {
+                animateLikeTap()
+                onLikeClick(boundAd ?: ad)
+            }
+            favorite?.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
+            share?.setOnClickListener { onShareClick(boundAd ?: ad) }
             tags.setOnClickListener { (boundAd ?: ad).tags.firstOrNull()?.let(onTagClick) }
             video?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
@@ -314,15 +319,36 @@ class AdAdapter(
                 }
             }
         }
+
+        private fun animateLikeTap() {
+            like.animate().cancel()
+            like.scaleX = 0.9f
+            like.scaleY = 0.9f
+            like.animate()
+                .scaleX(1.22f)
+                .scaleY(1.22f)
+                .setDuration(LIKE_POP_UP_MS)
+                .setInterpolator(OvershootInterpolator(1.8f))
+                .withEndAction {
+                    like.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(LIKE_SETTLE_MS)
+                        .start()
+                }
+                .start()
+        }
     }
 
-    private fun mediaBackground(color: Int, type: AdCardType): GradientDrawable {
+    private fun mediaBackground(color: Int, type: AdCardType, density: Float): GradientDrawable {
         return GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(color, darken(color))
         ).apply {
-            cornerRadius = 18f
-            if (type == AdCardType.VIDEO) setStroke(3, Color.argb(160, 255, 255, 255))
+            cornerRadius = 10f * density
+            if (type == AdCardType.VIDEO) {
+                setStroke((1.5f * density).roundToInt().coerceAtLeast(1), Color.argb(160, 255, 255, 255))
+            }
         }
     }
 
@@ -358,6 +384,8 @@ class AdAdapter(
         private const val MEDIA_RATIO_9_16 = 9f / 16f
         private const val CONTROLS_AUTO_HIDE_MS = 1_000L
         private const val CONTROLS_FADE_DURATION_MS = 500L
+        private const val LIKE_POP_UP_MS = 130L
+        private const val LIKE_SETTLE_MS = 90L
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)

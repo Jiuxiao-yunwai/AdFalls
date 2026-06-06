@@ -3,96 +3,96 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
     android:layout_marginBottom="14dp"
     android:background="@drawable/bg_ad_card"
-    android:orientation="horizontal"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
     android:padding="12dp">
 
-    <View
-        android:id="@+id/ad_media"
-        android:layout_width="116dp"
-        android:layout_height="128dp"
-        tools:background="#75CDB5" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="top"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/ad_brand"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_brand_chip"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:textColor="@color/app_text_tertiary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                tools:text="PixelBox" />
+
+            <TextView
+                android:id="@+id/ad_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:maxLines="2"
+                android:textColor="@color/app_text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                tools:text="学生党数码精简包" />
+
+            <TextView
+                android:id="@+id/ad_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:maxLines="2"
+                android:textColor="@color/app_text_secondary"
+                android:textSize="13sp"
+                tools:text="高性价比数码配件组合，适合校园通勤和学习场景。" />
+        </LinearLayout>
+
+        <View
+            android:id="@+id/ad_media"
+            android:layout_width="116dp"
+            android:layout_height="132dp"
+            android:layout_marginStart="10dp"
+            tools:background="#75CDB5" />
+    </LinearLayout>
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/ad_brand"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#6D6D6D"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            tools:text="PixelBox" />
-
-        <TextView
-            android:id="@+id/ad_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:maxLines="2"
-            android:textColor="#151515"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            tools:text="学生党数码精简包" />
-
-        <TextView
-            android:id="@+id/ad_summary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:maxLines="2"
-            android:textColor="#454545"
-            android:textSize="13sp"
-            tools:text="高性价比数码配件组合，适合校园通勤和学习场景。" />
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
         <TextView
             android:id="@+id/ad_tags"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_weight="1"
             android:maxLines="1"
-            android:textColor="#1F7A68"
+            android:minHeight="34dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:textColor="@color/app_accent_strong"
             android:textSize="12sp"
             tools:text="#数码  #学生  #性价比" />
 
         <TextView
-            android:id="@+id/ad_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textColor="#777777"
-            android:textSize="11sp"
-            tools:text="曝光 47 · 点击 9" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/action_like"
-                style="@style/AdActionButtonSmall"
-                tools:text="点赞" />
-
-            <TextView
-                android:id="@+id/action_favorite"
-                style="@style/AdActionButtonSmall"
-                android:layout_marginStart="6dp"
-                tools:text="收藏" />
-
-            <TextView
-                android:id="@+id/action_share"
-                style="@style/AdActionButtonSmall"
-                android:layout_marginStart="6dp"
-                tools:text="分享" />
-        </LinearLayout>
+            android:id="@+id/action_like"
+            style="@style/AdInlineLikeButton"
+            android:layout_marginStart="8dp"
+            android:drawableStart="@drawable/ic_inline_like"
+            tools:text="12" />
     </LinearLayout>
 </LinearLayout>

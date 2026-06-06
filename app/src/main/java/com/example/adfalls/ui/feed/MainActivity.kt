@@ -22,6 +22,7 @@ import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
 import com.example.adfalls.ui.aichat.AiChatActivity
+import com.example.adfalls.ui.common.applyResponsiveHorizontalPadding
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
@@ -54,9 +55,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_main)
+        findViewById<View>(R.id.main_root).applyResponsiveHorizontalPadding()
         viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
 
         tabs = listOf(
@@ -135,8 +137,8 @@ class MainActivity : ComponentActivity() {
         })
 
         swipeRefresh = findViewById(R.id.swipe_refresh)
-        swipeRefresh.setColorSchemeColors(Color.WHITE, Color.rgb(78, 164, 255))
-        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.rgb(28, 28, 28))
+        swipeRefresh.setColorSchemeColors(getColor(R.color.app_text_on_dark_primary), getColor(R.color.app_refresh_blue))
+        swipeRefresh.setProgressBackgroundColorSchemeColor(getColor(R.color.app_surface_dark_pressed))
         swipeRefresh.setOnRefreshListener {
             viewModel.refresh()
             swipeRefresh.isRefreshing = false
@@ -209,7 +211,13 @@ class MainActivity : ComponentActivity() {
     private fun updateTabs(activeChannel: AdChannel) {
         val activeIndex = AdChannel.entries.indexOf(activeChannel)
         tabs.forEachIndexed { index, tab ->
-            tab.setTextColor(if (index == activeIndex) Color.WHITE else Color.rgb(145, 145, 145))
+            tab.setTextColor(
+                if (index == activeIndex) {
+                    getColor(R.color.app_text_on_dark_primary)
+                } else {
+                    getColor(R.color.app_text_on_dark_muted)
+                }
+            )
             tab.setBackgroundColor(Color.TRANSPARENT)
         }
         moveTabIndicator(activeIndex)

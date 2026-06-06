@@ -1,206 +1,271 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F8"
+    android:background="@drawable/bg_detail_shell"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="18dp">
-
-        <TextView
-            android:id="@+id/back_button"
-            android:layout_width="48dp"
-            android:layout_height="38dp"
-            android:background="@drawable/bg_action_button"
-            android:gravity="center"
-            android:text="‹"
-            android:textColor="#222222"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/detail_channel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:textColor="#1F7A68"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            tools:text="精选" />
-
-        <TextView
-            android:id="@+id/detail_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="#111111"
-            android:textSize="27sp"
-            android:textStyle="bold"
-            tools:text="城市夜跑能量补给" />
-
-        <TextView
-            android:id="@+id/detail_brand"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="#646464"
-            android:textSize="14sp"
-            tools:text="PulseRun" />
-
-        <FrameLayout
-            android:id="@+id/detail_media_container"
-            android:layout_width="match_parent"
-            android:layout_height="240dp"
-            android:layout_marginTop="16dp">
-
-            <FrameLayout
-                android:id="@+id/detail_media"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#222222"
-                tools:background="#222222" />
-
-            <ImageButton
-                android:id="@+id/detail_video"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_video_control_circle"
-                android:contentDescription="播放"
-                android:padding="15dp"
-                android:scaleType="center"
-                android:src="@drawable/ic_video_play"
-                android:visibility="gone"
-                tools:visibility="visible" />
-
-            <ImageButton
-                android:id="@+id/detail_mute"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_gravity="top|end"
-                android:layout_marginTop="12dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/bg_video_control_circle"
-                android:contentDescription="静音"
-                android:padding="6dp"
-                android:scaleType="center"
-                android:src="@drawable/ic_volume_off"
-                android:visibility="gone"
-                tools:visibility="visible" />
-
-            <LinearLayout
-                android:id="@+id/detail_progress_panel"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_gravity="bottom"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <ProgressBar
-                    android:id="@+id/detail_progress"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    android:layout_width="0dp"
-                    android:layout_height="4dp"
-                    android:layout_weight="1"
-                    android:max="10000"
-                    android:progress="0"
-                    android:progressDrawable="@drawable/bg_video_progress_white" />
-
-                <TextView
-                    android:id="@+id/detail_time"
-                    android:layout_width="78dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:gravity="end"
-                    android:text="0:00 / 0:00"
-                    android:textColor="#FFFFFF"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </FrameLayout>
-
-        <TextView
-            android:id="@+id/detail_summary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:lineSpacingExtra="3dp"
-            android:textColor="#202020"
-            android:textSize="16sp"
-            tools:text="轻量运动补给和夜跑装备组合，为城市夜跑人群提供舒适、反光和便携体验。" />
-
-        <TextView
-            android:id="@+id/detail_body"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:lineSpacingExtra="3dp"
-            android:textColor="#4A4A4A"
-            android:textSize="15sp"
-            tools:text="本广告围绕夜间运动安全、补水和轻装备展开，适合下班后跑步、校园夜跑和周末训练等场景。" />
-
-        <TextView
-            android:id="@+id/detail_tags"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:textColor="#1F7A68"
-            android:textSize="14sp"
-            tools:text="#运动  #夜跑  #年轻人" />
-
-        <TextView
-            android:id="@+id/detail_stats"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:textColor="#777777"
-            android:textSize="13sp"
-            tools:text="曝光 42 · 点击 8 · 分享 3" />
-
-        <TextView
-            android:id="@+id/detail_ask_ai"
-            android:layout_width="match_parent"
-            android:layout_height="46dp"
-            android:layout_marginTop="18dp"
-            android:background="@drawable/bg_dark_button"
-            android:gravity="center"
-            android:text="@string/detail_ask_ai"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="96dp">
 
         <LinearLayout
+            android:id="@+id/detail_content"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="24dp"
-            android:orientation="horizontal">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="32dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="top"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/back_button"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/bg_detail_back_button"
+                    android:contentDescription="返回"
+                    android:padding="15dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_nav_back"
+                    android:tint="@color/app_text_primary" />
+
+                <TextView
+                    android:id="@+id/detail_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/app_text_primary"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    tools:text="城市夜跑能量补给" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/detail_media_container"
+                android:layout_width="match_parent"
+                android:layout_height="240dp"
+                android:layout_marginTop="18dp">
+
+                <FrameLayout
+                    android:id="@+id/detail_media"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@color/app_surface_dark"
+                    tools:background="@color/app_surface_dark" />
+
+                <ImageButton
+                    android:id="@+id/detail_video"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_video_control_circle"
+                    android:contentDescription="播放"
+                    android:padding="15dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_video_play"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <ImageButton
+                    android:id="@+id/detail_mute"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/bg_video_mute_circle"
+                    android:contentDescription="静音"
+                    android:padding="13dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_volume_off"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <LinearLayout
+                    android:id="@+id/detail_progress_panel"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_gravity="bottom"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <ProgressBar
+                        android:id="@+id/detail_progress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_weight="1"
+                        android:max="10000"
+                        android:progress="0"
+                        android:progressDrawable="@drawable/bg_video_progress_white" />
+
+                    <TextView
+                        android:id="@+id/detail_time"
+                        android:layout_width="78dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:gravity="end"
+                        android:text="0:00 / 0:00"
+                        android:textColor="@color/app_text_on_dark_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/detail_brand"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_brand_chip"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/app_text_tertiary"
+                    android:textSize="14sp"
+                    tools:text="PulseRun" />
+
+                <TextView
+                    android:id="@+id/detail_channel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_brand_chip"
+                    android:minHeight="32dp"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/app_accent_strong"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="精选" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/detail_like"
-                style="@style/DetailActionButton"
-                tools:text="点赞 12" />
+                android:id="@+id/detail_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/app_text_primary"
+                android:textSize="16sp"
+                tools:text="轻量运动补给和夜跑装备组合，为城市夜跑人群提供舒适、反光和便携体验。" />
 
             <TextView
-                android:id="@+id/detail_favorite"
-                style="@style/DetailActionButton"
-                android:layout_marginStart="8dp"
-                tools:text="收藏" />
+                android:id="@+id/detail_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/app_text_secondary"
+                android:textSize="15sp"
+                tools:text="本广告围绕夜间运动安全、补水和轻装备展开，适合下班后跑步、校园夜跑和周末训练等场景。" />
 
             <TextView
-                android:id="@+id/detail_share"
-                style="@style/DetailActionButton"
-                android:layout_marginStart="8dp"
-                tools:text="分享" />
+                android:id="@+id/detail_tags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:minHeight="36dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/app_accent_strong"
+                android:textSize="14sp"
+                tools:text="#运动  #夜跑  #年轻人" />
+
+            <TextView
+                android:id="@+id/detail_stats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textColor="@color/app_text_tertiary"
+                android:textSize="13sp"
+                tools:text="曝光 42 · 点击 8 · 分享 3" />
+
+            <TextView
+                android:id="@+id/detail_ask_ai"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/bg_ai_button"
+                android:gravity="center"
+                android:text="@string/detail_ask_ai"
+                android:textColor="@color/app_accent_on"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/detail_action_dock"
+        android:layout_width="wrap_content"
+        android:layout_height="60dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="18dp"
+        android:background="@drawable/bg_detail_action_dock"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
+
+        <ImageButton
+            android:id="@+id/detail_favorite"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_detail_icon_button"
+            android:contentDescription="收藏"
+            android:padding="13dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_detail_favorite_selector"
+            android:tint="@color/detail_favorite_icon_tint" />
+
+        <ImageButton
+            android:id="@+id/detail_like"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_detail_icon_button"
+            android:contentDescription="点赞"
+            android:padding="13dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_action_like"
+            android:tint="@color/detail_like_icon_tint" />
+
+        <ImageButton
+            android:id="@+id/detail_share"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_detail_icon_button"
+            android:contentDescription="分享"
+            android:padding="13dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_action_share"
+            android:tint="@color/action_button_content" />
     </LinearLayout>
-</ScrollView>
+</FrameLayout>

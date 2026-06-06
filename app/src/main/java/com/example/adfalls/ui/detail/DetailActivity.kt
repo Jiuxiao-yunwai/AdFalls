@@ -40,8 +40,8 @@ class DetailActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_detail)
         viewModel = ViewModelProvider.create(this)[DetailViewModel::class]
         viewModel.loadAd(intent.getLongExtra(EXTRA_AD_ID, -1L))
@@ -106,7 +106,7 @@ class DetailActivity : ComponentActivity() {
         mediaContainer.background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(ad.mediaColor, darken(ad.mediaColor))
-        ).apply { cornerRadius = 22f }
+        ).apply { cornerRadius = 10f * resources.displayMetrics.density }
         resizeMedia(ad.type)
         playerView.useController = false
         if (ad.type == AdCardType.VIDEO) {
@@ -138,16 +138,18 @@ class DetailActivity : ComponentActivity() {
             VideoPlaybackPool.detach(playerView)
         }
 
-        val like = findViewById<TextView>(R.id.detail_like)
-        val favorite = findViewById<TextView>(R.id.detail_favorite)
-        val share = findViewById<TextView>(R.id.detail_share)
+        val like = findViewById<ImageButton>(R.id.detail_like)
+        val favorite = findViewById<ImageButton>(R.id.detail_favorite)
+        val share = findViewById<ImageButton>(R.id.detail_share)
         val video = findViewById<ImageButton>(R.id.detail_video)
         val mute = findViewById<ImageButton>(R.id.detail_mute)
         val progressPanel = findViewById<View>(R.id.detail_progress_panel)
 
-        like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
-        favorite.text = if (ad.favorited) "已收藏" else "收藏"
-        share.text = "分享"
+        like.isSelected = ad.liked
+        favorite.isSelected = ad.favorited
+        like.contentDescription = if (ad.liked) "取消点赞，当前 ${ad.likes} 个赞" else "点赞，当前 ${ad.likes} 个赞"
+        favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
+        share.contentDescription = "分享，当前 ${ad.shares} 次分享"
         video.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
         mute.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
         video.contentDescription = if (ad.playing) "暂停" else "播放"
