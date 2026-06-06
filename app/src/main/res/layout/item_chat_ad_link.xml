@@ -8,14 +8,15 @@
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:minHeight="96dp"
+    android:padding="14dp">
 
     <TextView
         android:id="@+id/chat_ad_link_brand"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="#75CDB5"
-        android:textSize="11sp"
+        android:textColor="@color/app_accent"
+        android:textSize="12sp"
         android:textStyle="bold"
         tools:text="PixelBox" />
 
@@ -24,7 +25,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/app_text_on_dark_primary"
         android:textSize="15sp"
         android:textStyle="bold"
         tools:text="学生党数码精简包" />
@@ -35,8 +36,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="5dp"
         android:maxLines="2"
-        android:textColor="#C8C8C8"
-        android:textSize="12sp"
+        android:textColor="@color/app_text_on_dark_secondary"
+        android:textSize="13sp"
         tools:text="高性价比数码配件组合，适合校园通勤和学习场景。" />
 
     <TextView
@@ -45,8 +46,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:maxLines="1"
-        android:textColor="#9BE4D0"
-        android:textSize="11sp"
+        android:textColor="@color/app_accent_soft"
+        android:textSize="12sp"
         tools:text="#数码  #学生  #性价比" />
 
     <TextView
@@ -55,7 +56,9 @@
         android:layout_gravity="end"
         android:layout_marginTop="7dp"
         android:text="@string/chat_ad_link_open"
-        android:textColor="#75CDB5"
-        android:textSize="12sp"
+        android:minHeight="36dp"
+        android:gravity="center"
+        android:textColor="@color/app_accent"
+        android:textSize="13sp"
         android:textStyle="bold" />
 </LinearLayout>

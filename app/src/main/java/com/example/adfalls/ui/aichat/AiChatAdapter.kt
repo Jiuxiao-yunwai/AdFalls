@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AiChatMessage
 import com.example.adfalls.data.model.ChatRole
+import kotlin.math.roundToInt
 
 class AiChatAdapter(
     private val onAdRecommendationClick: (Long) -> Unit
@@ -43,22 +44,24 @@ class AiChatAdapter(
         private val onAdRecommendationClick: (Long) -> Unit
     ) : RecyclerView.ViewHolder(itemView) {
         private val messageText: TextView = itemView.findViewById(R.id.chat_message_text)
+        private val recommendationCard: View? = itemView.findViewById(R.id.chat_recommendation_card)
         private val recommendationLinks: LinearLayout? = itemView.findViewById(R.id.chat_recommendation_links)
         private val recommendationEmpty: TextView? = itemView.findViewById(R.id.chat_recommendation_empty)
 
         fun bind(message: AiChatMessage) {
             messageText.text = message.text
+            applyTrackRelativeWidth()
             when (message.role) {
                 ChatRole.ERROR -> {
-                    messageText.setTextColor(0xFFFFB4B4.toInt())
+                    messageText.setTextColor(itemView.context.getColor(R.color.app_error))
                     messageText.setBackgroundResource(R.drawable.bg_chat_error_bubble)
                 }
                 ChatRole.USER -> {
-                    messageText.setTextColor(0xFF101010.toInt())
+                    messageText.setTextColor(itemView.context.getColor(R.color.app_text_primary))
                     messageText.setBackgroundResource(R.drawable.bg_chat_user_bubble)
                 }
                 ChatRole.ASSISTANT -> {
-                    messageText.setTextColor(0xFFFFFFFF.toInt())
+                    messageText.setTextColor(itemView.context.getColor(R.color.app_text_on_dark_primary))
                     if (message.relatedAdIds.isEmpty()) {
                         messageText.setBackgroundResource(R.drawable.bg_chat_assistant_bubble)
                     } else {
@@ -66,7 +69,7 @@ class AiChatAdapter(
                     }
                 }
                 ChatRole.LOADING -> {
-                    messageText.setTextColor(0xFFCFCFCF.toInt())
+                    messageText.setTextColor(itemView.context.getColor(R.color.app_text_on_dark_secondary))
                     messageText.setBackgroundResource(R.drawable.bg_chat_assistant_bubble)
                 }
             }
@@ -86,10 +89,31 @@ class AiChatAdapter(
                 recommendationLinks?.addView(link)
             }
         }
+
+        private fun applyTrackRelativeWidth() {
+            val rowWidth = itemView.width
+            if (rowWidth <= 0) {
+                itemView.post { applyTrackRelativeWidth() }
+                return
+            }
+            val maxMessageWidth = (rowWidth * MESSAGE_MAX_TRACK_FRACTION).roundToInt()
+            recommendationCard?.let { card ->
+                card.layoutParams = card.layoutParams.apply {
+                    width = (rowWidth * RECOMMENDATION_CARD_TRACK_FRACTION).roundToInt()
+                }
+                return
+            }
+            messageText.maxWidth = maxMessageWidth
+        }
     }
 
     private object Diff : DiffUtil.ItemCallback<AiChatMessage>() {
         override fun areItemsTheSame(oldItem: AiChatMessage, newItem: AiChatMessage): Boolean = oldItem.id == newItem.id
         override fun areContentsTheSame(oldItem: AiChatMessage, newItem: AiChatMessage): Boolean = oldItem == newItem
+    }
+
+    private companion object {
+        private const val MESSAGE_MAX_TRACK_FRACTION = 0.8f
+        private const val RECOMMENDATION_CARD_TRACK_FRACTION = 0.9f
     }
 }
