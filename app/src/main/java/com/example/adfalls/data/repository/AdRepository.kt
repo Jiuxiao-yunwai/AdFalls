@@ -111,6 +111,11 @@ object AdRepository {
         ids.mapNotNull(adsById::get)
     }
 
+    suspend fun listAds(channel: AdChannel): List<AdItem> = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        dao().getAdsByChannel(channel.name).map { it.toModel() }
+    }
+
     suspend fun searchAds(channel: AdChannel, query: String): List<AdItem> = withContext(Dispatchers.IO) {
         seedIfNeeded()
         runCatching {
@@ -476,11 +481,9 @@ object AdRepository {
     }
 
     private fun buildLocalAdAnalysis(ad: AdItem): String {
-        val audience = ad.tags.joinToString("、").ifBlank { ad.channel.title }
-        return "这条广告更适合关注${audience}的用户。\n\n" +
-            "核心卖点是：${ad.summary}\n\n" +
-            "在信息流里，它的标题“${ad.title}”能先建立主题识别，详情内容可以继续突出使用场景、" +
-            "具体利益点和行动入口。\n\n" +
-            "优化建议：把目标人群、主要场景和一个明确行动点放在前半句，减少泛泛描述。"
+        val scenarios = ad.tags.joinToString("、").ifBlank { ad.channel.title }
+        return "${ad.title} 是 ${ad.brand} 带来的一个围绕${scenarios}展开的产品或服务。\n\n" +
+            "它主要想解决的是用户在相关场景里的选择和体验问题：${ad.summary}\n\n" +
+            "从当前信息看，它的亮点在于把${scenarios}相关需求集中到一个更清晰、方便理解的使用场景里。"
     }
 }

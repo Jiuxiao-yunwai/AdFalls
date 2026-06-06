@@ -74,6 +74,28 @@ data class BackendAdDto(
     }
 }
 
+data class BackendAdMetricDto(
+    val id: Long,
+    val title: String,
+    val channel: String,
+    val type: String,
+    val summary: String,
+    val tags: List<String>,
+    val coverUrl: String?,
+    val exposures: Int,
+    val clicks: Int,
+    val detailViews: Int,
+    val likeEvents: Int,
+    val unlikeEvents: Int,
+    val favoriteEvents: Int,
+    val unfavoriteEvents: Int,
+    val videoPlays: Int,
+    val currentLikes: Int,
+    val currentFavorites: Int,
+    val ctr: Double,
+    val lastBehaviorAt: String?
+)
+
 object AdFallsApiClient {
     private const val DEFAULT_TIMEOUT_MS = 60_000
     private val baseUrl = BuildConfig.ADFALLS_API_BASE_URL.trimEnd('/')
@@ -135,6 +157,28 @@ object AdFallsApiClient {
         ).getJSONObject("data")
         BackendPage(
             items = data.getJSONArray("list").mapObjects { it.toBackendAdDto() },
+            nextCursor = data.optString("nextCursor", ""),
+            hasMore = data.optBoolean("hasMore", false)
+        )
+    }
+
+    suspend fun fetchAdMetrics(
+        channel: String?,
+        keyword: String?,
+        cursor: String?,
+        size: Int
+    ): BackendPage<BackendAdMetricDto> = withContext(Dispatchers.IO) {
+        val data = requestJson(
+            path = "/api/admin/ads/metrics",
+            query = mapOf(
+                "channel" to channel?.takeIf { it.isNotBlank() },
+                "keyword" to keyword?.takeIf { it.isNotBlank() },
+                "cursor" to cursor.orEmpty(),
+                "size" to size.toString()
+            )
+        ).getJSONObject("data")
+        BackendPage(
+            items = data.getJSONArray("list").mapObjects { it.toBackendAdMetricDto() },
             nextCursor = data.optString("nextCursor", ""),
             hasMore = data.optBoolean("hasMore", false)
         )
@@ -264,6 +308,30 @@ object AdFallsApiClient {
             type = optString("type", "IMAGE_LARGE"),
             targetUrl = optString("targetUrl").takeIf { it.isNotBlank() },
             isFavorite = optBoolean("isFavorite", false)
+        )
+    }
+
+    private fun JSONObject.toBackendAdMetricDto(): BackendAdMetricDto {
+        return BackendAdMetricDto(
+            id = getLong("id"),
+            title = optString("title"),
+            channel = optString("channel"),
+            type = optString("type"),
+            summary = optString("summary"),
+            tags = optJSONArray("tags")?.toStringList().orEmpty(),
+            coverUrl = optString("coverUrl").takeIf { it.isNotBlank() },
+            exposures = optInt("exposures"),
+            clicks = optInt("clicks"),
+            detailViews = optInt("detailViews"),
+            likeEvents = optInt("likeEvents"),
+            unlikeEvents = optInt("unlikeEvents"),
+            favoriteEvents = optInt("favoriteEvents"),
+            unfavoriteEvents = optInt("unfavoriteEvents"),
+            videoPlays = optInt("videoPlays"),
+            currentLikes = optInt("currentLikes"),
+            currentFavorites = optInt("currentFavorites"),
+            ctr = optDouble("ctr"),
+            lastBehaviorAt = optString("lastBehaviorAt").takeIf { it.isNotBlank() && it != "null" }
         )
     }
 

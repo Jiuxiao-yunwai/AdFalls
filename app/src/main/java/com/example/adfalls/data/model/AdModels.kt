@@ -32,3 +32,27 @@ data class AdItem(
     val impressions: Int = 0,
     val clicks: Int = 0
 )
+
+data class AdMetric(
+    val id: Long,
+    val title: String,
+    val channel: String,
+    val type: String,
+    val summary: String,
+    val tags: List<String>,
+    val exposures: Int,
+    val clicks: Int,
+    val detailViews: Int,
+    val likeEvents: Int,
+    val unlikeEvents: Int,
+    val favoriteEvents: Int,
+    val unfavoriteEvents: Int,
+    val videoPlays: Int,
+    val currentLikes: Int,
+    val currentFavorites: Int,
+    val ctr: Double,
+    val lastBehaviorAt: String?
+) {
+    val interactionCount: Int
+        get() = clicks + detailViews + likeEvents + favoriteEvents + videoPlays
+}

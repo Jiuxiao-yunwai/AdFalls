@@ -18,10 +18,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
-import com.example.adfalls.ui.common.applyResponsiveHorizontalPadding
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.feed.AdAdapter
+import com.example.adfalls.ui.metrics.AdMetricsActivity
 import com.example.adfalls.viewmodel.SearchViewModel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 class SearchActivity : ComponentActivity() {
@@ -29,13 +30,14 @@ class SearchActivity : ComponentActivity() {
     private lateinit var adapter: AdAdapter
     private lateinit var input: EditText
     private lateinit var emptyState: TextView
+    private var metricsLaunchArmed = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = getColor(R.color.app_bg)
         window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_search)
-        findViewById<View>(R.id.search_root).applyResponsiveHorizontalPadding()
+        findViewById<View>(R.id.search_root).applySearchResponsiveHorizontalPadding()
 
         val channel = intent.getStringExtra(EXTRA_CHANNEL)
             ?.let { runCatching { AdChannel.valueOf(it) }.getOrNull() }
@@ -74,7 +76,16 @@ class SearchActivity : ComponentActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                viewModel.updateSearchText(s?.toString().orEmpty())
+                val text = s?.toString().orEmpty()
+                if (text.trim().equals(METRICS_ENTRY_QUERY, ignoreCase = true)) {
+                    if (metricsLaunchArmed) {
+                        metricsLaunchArmed = false
+                        startActivity(Intent(this@SearchActivity, AdMetricsActivity::class.java))
+                    }
+                    return
+                }
+                metricsLaunchArmed = true
+                viewModel.updateSearchText(text)
             }
 
             override fun afterTextChanged(s: Editable?) = Unit
@@ -108,5 +119,14 @@ class SearchActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_CHANNEL = "extra_channel"
+        private const val METRICS_ENTRY_QUERY = "dancebyte"
+    }
+
+    private fun View.applySearchResponsiveHorizontalPadding() {
+        val density = resources.displayMetrics.density
+        val horizontal = (resources.displayMetrics.widthPixels * 0.10f)
+            .roundToInt()
+            .coerceIn((32f * density).roundToInt(), (56f * density).roundToInt())
+        setPaddingRelative(horizontal, paddingTop, horizontal, paddingBottom)
     }
 }
