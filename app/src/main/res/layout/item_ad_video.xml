@@ -22,7 +22,15 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/app_surface_dark"
-            tools:background="@color/app_surface_dark" />
+            tools:background="@color/app_surface_dark">
+
+            <ImageView
+                android:id="@+id/ad_media_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+        </FrameLayout>
 
         <ImageButton
             android:id="@+id/action_video"

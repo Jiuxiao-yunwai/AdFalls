@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.media3.ui.PlayerView
@@ -25,7 +26,11 @@ import com.example.adfalls.R
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.ui.common.RemoteImageLoader
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class AdAdapter(
     private val onCardClick: (AdItem) -> Unit,
@@ -37,6 +42,7 @@ class AdAdapter(
     private val onTagClick: (String) -> Unit
 ) : ListAdapter<AdItem, RecyclerView.ViewHolder>(Diff) {
     private var footerText: String? = null
+    private val imageScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     fun submitAds(items: List<AdItem>, footerText: String? = null, commitCallback: (() -> Unit)? = null) {
         submitList(items) {
@@ -95,6 +101,7 @@ class AdAdapter(
     inner class AdViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val mediaContainer: View? = itemView.findViewById(R.id.ad_media_container)
         private val media: View = itemView.findViewById(R.id.ad_media)
+        private val mediaImage: ImageView? = itemView.findViewById(R.id.ad_media_image)
         private val title: TextView = itemView.findViewById(R.id.ad_title)
         private val brand: TextView = itemView.findViewById(R.id.ad_brand)
         private val summary: TextView = itemView.findViewById(R.id.ad_summary)
@@ -136,23 +143,35 @@ class AdAdapter(
                 mute?.animate()?.cancel()
                 mute?.alpha = 1f
                 mute?.visibility = View.VISIBLE
+                progressPanel?.visibility = View.VISIBLE
                 startProgressUpdates(ad.id)
                 updateVideoState(ad)
             } else {
                 keepControlsVisibleOnNextBind = false
                 mute?.visibility = View.GONE
+                progressPanel?.visibility = View.GONE
                 hidePlaybackControls(animate = false)
             }
 
             resizeMedia(ad.type)
             media.background = mediaBackground(ad.mediaColor, ad.type, itemView.resources.displayMetrics.density)
+            bindCover(ad)
             if (ad.type == AdCardType.VIDEO) {
                 ensurePlayerView()?.let {
                     it.useController = false
                     VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+                    val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+                    it.visibility = if (shouldShowPlayer) {
+                        View.VISIBLE
+                    } else {
+                        View.INVISIBLE
+                    }
+                    mediaImage?.visibility = View.VISIBLE
                 }
             } else {
+                mediaImage?.visibility = View.VISIBLE
                 playerView?.let(VideoPlaybackPool::detach)
+                playerView?.visibility = View.INVISIBLE
             }
             like.isSelected = ad.liked
             favorite?.isSelected = ad.favorited
@@ -235,6 +254,8 @@ class AdAdapter(
 
         fun getPlayerView(): PlayerView? = playerView
 
+        fun ensurePlayerViewForAutoplay(): PlayerView? = ensurePlayerView()
+
         fun getBoundAd(): AdItem? = boundAd
 
         fun updateVideoState(ad: AdItem) {
@@ -247,10 +268,21 @@ class AdAdapter(
             mute?.alpha = 1f
             mute?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
             if (ad.type != AdCardType.VIDEO) {
+                mediaImage?.visibility = View.VISIBLE
+                playerView?.visibility = View.INVISIBLE
                 keepControlsVisibleOnNextBind = false
+                progressPanel?.visibility = View.GONE
                 hidePlaybackControls(animate = false)
                 return
             }
+            progressPanel?.visibility = View.VISIBLE
+            val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+            playerView?.visibility = if (shouldShowPlayer) {
+                View.VISIBLE
+            } else {
+                View.INVISIBLE
+            }
+            mediaImage?.visibility = View.VISIBLE
             if (ad.playing) {
                 if (keepControlsVisibleOnNextBind) {
                     keepControlsVisibleOnNextBind = false
@@ -277,7 +309,12 @@ class AdAdapter(
             val existing = playerView
             if (existing != null) return existing
             val container = media as? ViewGroup ?: return null
-            return PlayerView(itemView.context).apply {
+            val view = LayoutInflater.from(itemView.context).inflate(
+                R.layout.view_ad_player,
+                container,
+                false
+            ) as PlayerView
+            return view.apply {
                 useController = false
                 useArtwork = false
                 layoutParams = FrameLayout.LayoutParams(
@@ -285,8 +322,14 @@ class AdAdapter(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 container.addView(this, 0)
+                bringToFront()
                 playerView = this
             }
+        }
+
+        private fun bindCover(ad: AdItem) {
+            val imageView = mediaImage ?: media as? ImageView ?: return
+            RemoteImageLoader.load(imageScope, imageView, ad.coverUrl, ad.mediaColor)
         }
 
         private fun startProgressUpdates(adId: Long) {

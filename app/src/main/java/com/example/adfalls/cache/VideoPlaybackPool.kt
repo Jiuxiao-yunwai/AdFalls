@@ -1,12 +1,14 @@
 package com.example.adfalls.cache
 
 import android.content.Context
-import androidx.media3.common.MediaItem
+import android.view.View
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.adfalls.data.repository.AdRepository
+import java.util.WeakHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -17,41 +19,78 @@ object VideoPlaybackPool {
     private var activeVideoUrl: String? = null
     private var attachedView: PlayerView? = null
     private var sharedMuted: Boolean? = null
-    private val playbackPositions = mutableMapOf<Long, Long>()
-    private val playbackDurations = mutableMapOf<Long, Long>()
+    private var activeFrameReady = false
+    private val pausedFrameIds = mutableSetOf<Long>()
+    private val playbackStates = mutableMapOf<Long, PlaybackState>()
+    private val viewBindings = WeakHashMap<PlayerView, ViewBinding>()
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
     }
 
-    // Reuses one shared ExoPlayer so only one video is active at a time.
+    fun hasActiveFrame(id: Long, videoUrl: String?): Boolean {
+        return !videoUrl.isNullOrBlank() &&
+            activeVideoId == id &&
+            activeVideoUrl == videoUrl &&
+            player != null &&
+            attachedView != null &&
+            activeFrameReady
+    }
+
+    fun isPlaybackActive(id: Long, videoUrl: String?): Boolean {
+        if (videoUrl.isNullOrBlank() || activeVideoId != id || activeVideoUrl != videoUrl) return false
+        if (id in pausedFrameIds) return false
+        val currentPlayer = player ?: return false
+        return currentPlayer.isPlaying || currentPlayer.playWhenReady
+    }
+
+    fun pauseFrameNow(id: Long): Boolean {
+        if (activeVideoId != id) return false
+        saveActiveState()
+        pausedFrameIds.add(id)
+        player?.pause()
+        return true
+    }
+
     fun attach(playerView: PlayerView, id: Long, videoUrl: String?, playing: Boolean, muted: Boolean) {
-        if (videoUrl.isNullOrBlank() || activeVideoId != id || activeVideoUrl != videoUrl) {
-            if (attachedView == playerView) playerView.player = null
+        if (videoUrl.isNullOrBlank()) {
+            detach(playerView)
             return
         }
-        attachedView?.takeIf { it != playerView }?.player = null
-        attachedView = playerView
-        playerView.player = requirePlayer().apply {
-            volume = if (resolveMuted(muted)) 0f else 1f
-            playWhenReady = playing
+        viewBindings[playerView] = ViewBinding(id, videoUrl, muted)
+        val isActive = activeVideoId == id && activeVideoUrl == videoUrl && player != null
+        if (!isActive) {
+            if (attachedView == playerView) {
+                playerView.player = null
+                attachedView = null
+            }
+            return
+        }
+        attachActivePlayerTo(playerView)
+        playerView.visibility = if (activeFrameReady) View.VISIBLE else View.INVISIBLE
+        player?.volume = if (resolveMuted(muted)) 0f else 1f
+        if (playing && id !in pausedFrameIds) {
+            player?.playWhenReady = true
+            player?.play()
+        } else if (id in pausedFrameIds) {
+            player?.pause()
         }
     }
 
-    // Only detaches the PlayerView currently owned by the pool.
     fun detach(playerView: PlayerView) {
+        viewBindings.remove(playerView)
         if (attachedView == playerView) {
-            playerView.player = null
-            attachedView = null
+            saveActiveState()
+            releaseActivePlayer()
+            activeVideoId = null
+            activeVideoUrl = null
         }
     }
 
     fun progress(id: Long): Pair<Long, Long> {
-        val currentPlayer = player
-        if (activeVideoId == id && currentPlayer != null) {
-            saveActiveProgress()
-        }
-        return (playbackPositions[id] ?: 0L) to (playbackDurations[id] ?: 0L)
+        if (activeVideoId == id) saveActiveState()
+        val state = playbackStates[id]
+        return (state?.positionMs ?: 0L) to (state?.durationMs ?: 0L)
     }
 
     suspend fun togglePlay(id: Long) {
@@ -60,7 +99,7 @@ object VideoPlaybackPool {
     }
 
     suspend fun togglePlay(id: Long, videoUrl: String?, playing: Boolean, muted: Boolean) {
-        if (playing) {
+        if (willPauseOnToggle(id, playing)) {
             pause(id)
         } else {
             play(id, videoUrl, muted)
@@ -69,70 +108,60 @@ object VideoPlaybackPool {
 
     suspend fun play(id: Long) {
         val ad = AdRepository.findAd(id) ?: return
-        play(id, ad.videoUrl, ad.muted)
+        play(ad.id, ad.videoUrl, ad.muted)
     }
 
-    // Play state is written through AdRepository so Room keeps list and detail in sync.
     suspend fun play(id: Long, videoUrl: String?, muted: Boolean) {
         if (videoUrl.isNullOrBlank()) return
-        val effectiveMuted = resolveMuted(muted)
-        withContext(Dispatchers.Main) {
-            val player = requirePlayer()
-            if (activeVideoId != id || activeVideoUrl != videoUrl) {
-                saveActiveProgress()
-                player.setMediaItem(MediaItem.fromUri(videoUrl))
-                player.prepare()
-                player.seekTo(playbackPositions[id] ?: 0L)
-            }
-            activeVideoId?.takeIf { it != id }?.let {
-                withContext(Dispatchers.IO) { AdRepository.setVideoState(it, playing = false) }
-            }
-            activeVideoId = id
-            activeVideoUrl = videoUrl
-            player.repeatMode = Player.REPEAT_MODE_ONE
-            player.volume = if (effectiveMuted) 0f else 1f
-            player.playWhenReady = true
-            player.play()
-        }
-        AdRepository.setVideoState(id, playing = true, muted = effectiveMuted)
+        val targetView = withContext(Dispatchers.Main) {
+            viewBindings.entries.firstOrNull { (_, binding) ->
+                binding.id == id && binding.url == videoUrl
+            }?.key
+        } ?: return
+        playInView(id, videoUrl, muted, targetView)
     }
 
     suspend fun playInFeed(id: Long, videoUrl: String?, muted: Boolean, playerView: PlayerView) {
+        playInView(id, videoUrl, muted, playerView)
+    }
+
+    suspend fun playInView(id: Long, videoUrl: String?, muted: Boolean, playerView: PlayerView) {
         if (videoUrl.isNullOrBlank()) return
         val effectiveMuted = resolveMuted(muted)
-        var previousVideoId: Long? = null
-        withContext(Dispatchers.Main) {
-            val player = requirePlayer()
-            val switchingVideo = activeVideoId != id || activeVideoUrl != videoUrl
+        val previousVideoId = withContext(Dispatchers.Main) {
+            viewBindings[playerView] = ViewBinding(id, videoUrl, effectiveMuted)
+            val previous = activeVideoId?.takeIf { it != id }
+            val switchingVideo = activeVideoId != id || activeVideoUrl != videoUrl || player == null
             if (switchingVideo) {
-                previousVideoId = activeVideoId
-                saveActiveProgress()
-                player.setMediaItem(MediaItem.fromUri(videoUrl))
-                player.prepare()
-                player.seekTo(playbackPositions[id] ?: 0L)
+                saveActiveState()
+                rebuildPlayer(id, videoUrl, effectiveMuted)
             }
-            attachedView?.takeIf { it != playerView }?.player = null
-            attachedView = playerView
-            playerView.player = player
             activeVideoId = id
             activeVideoUrl = videoUrl
-            player.repeatMode = Player.REPEAT_MODE_ONE
-            player.volume = if (effectiveMuted) 0f else 1f
-            player.playWhenReady = true
-            player.play()
+            pausedFrameIds.remove(id)
+            attachActivePlayerTo(playerView)
+            val currentPlayer = requirePlayer()
+            currentPlayer.repeatMode = Player.REPEAT_MODE_ONE
+            currentPlayer.volume = if (effectiveMuted) 0f else 1f
+            playerView.visibility = if (activeFrameReady) View.VISIBLE else View.INVISIBLE
+            if (switchingVideo || !currentPlayer.isPlaying && !currentPlayer.playWhenReady) {
+                currentPlayer.seekTo(playbackStates[id]?.positionMs ?: 0L)
+            }
+            currentPlayer.playWhenReady = true
+            currentPlayer.play()
+            if (currentPlayer.playbackState == Player.STATE_READY) {
+                activeFrameReady = true
+                playerView.visibility = View.VISIBLE
+            }
+            previous
         }
-        previousVideoId?.takeIf { it != id }?.let {
-            AdRepository.setVideoState(it, playing = false)
-        }
+        previousVideoId?.let { AdRepository.setVideoState(it, playing = false) }
         AdRepository.setVideoState(id, playing = true, muted = effectiveMuted)
     }
 
     suspend fun pause(id: Long) {
         withContext(Dispatchers.Main) {
-            if (activeVideoId == id) {
-                saveActiveProgress()
-                player?.pause()
-            }
+            pauseFrameNow(id)
         }
         AdRepository.setVideoState(id, playing = false)
     }
@@ -140,15 +169,27 @@ object VideoPlaybackPool {
     suspend fun pauseFromFeed(id: Long) {
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
-                saveActiveProgress()
-                player?.pause()
-                attachedView?.player = null
-                attachedView = null
+                saveActiveState()
+                releaseActivePlayer()
                 activeVideoId = null
                 activeVideoUrl = null
             }
+            pausedFrameIds.remove(id)
         }
         AdRepository.setVideoState(id, playing = false)
+    }
+
+    suspend fun pauseActiveAndRelease() {
+        val pausedVideoId = withContext(Dispatchers.Main) {
+            val id = activeVideoId ?: return@withContext null
+            saveActiveState()
+            releaseActivePlayer()
+            activeVideoId = null
+            activeVideoUrl = null
+            pausedFrameIds.remove(id)
+            id
+        }
+        pausedVideoId?.let { AdRepository.setVideoState(it, playing = false) }
     }
 
     suspend fun toggleMute(id: Long) {
@@ -156,24 +197,96 @@ object VideoPlaybackPool {
         sharedMuted = muted
         withContext(Dispatchers.Main) {
             if (activeVideoId == id) {
-                requirePlayer().volume = if (muted) 0f else 1f
+                player?.volume = if (muted) 0f else 1f
+                saveActiveState(mutedOverride = muted)
             }
         }
         AdRepository.setAllVideoMuted(muted)
     }
 
-    // Call from a host's final teardown path when the shared player is no longer needed.
     fun release() {
-        player?.pause()
-        attachedView?.player = null
-        attachedView = null
+        saveActiveState()
+        releaseActivePlayer()
         activeVideoId = null
         activeVideoUrl = null
-        playbackPositions.clear()
-        playbackDurations.clear()
+        pausedFrameIds.clear()
+        playbackStates.clear()
+        viewBindings.clear()
         sharedMuted = null
+    }
+
+    fun willPauseOnToggle(id: Long, modelPlaying: Boolean): Boolean {
+        val url = activeVideoUrl
+        if (activeVideoId == id && url != null) return isPlaybackActive(id, url)
+        return modelPlaying
+    }
+
+    private fun rebuildPlayer(id: Long, videoUrl: String, muted: Boolean) {
+        releaseActivePlayer()
+        player = ExoPlayer.Builder(checkNotNull(appContext) { "VideoPlaybackPool is not initialized." })
+            .build()
+            .apply {
+                activeFrameReady = false
+                addListener(
+                    object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState == Player.STATE_READY) {
+                                activeFrameReady = true
+                                attachedView?.visibility = View.VISIBLE
+                            }
+                        }
+                    }
+                )
+                repeatMode = Player.REPEAT_MODE_ONE
+                volume = if (resolveMuted(muted)) 0f else 1f
+                setMediaItem(MediaItem.fromUri(playableVideoUrl(videoUrl)))
+                prepare()
+                seekTo(playbackStates[id]?.positionMs ?: 0L)
+            }
+    }
+
+    private fun attachActivePlayerTo(playerView: PlayerView) {
+        val currentPlayer = requirePlayer()
+        if (attachedView == playerView && playerView.player === currentPlayer) return
+        attachedView?.player = null
+        playerView.player = currentPlayer
+        attachedView = playerView
+    }
+
+    private fun releaseActivePlayer() {
+        attachedView?.player = null
+        attachedView = null
         player?.release()
         player = null
+        activeFrameReady = false
+    }
+
+    private fun saveActiveState(mutedOverride: Boolean? = null) {
+        val id = activeVideoId ?: return
+        val url = activeVideoUrl ?: return
+        val currentPlayer = player ?: return
+        val duration = currentPlayer.duration
+        val durationMs = if (duration != C.TIME_UNSET && duration > 0L) {
+            duration
+        } else {
+            playbackStates[id]?.durationMs ?: 0L
+        }
+        val position = currentPlayer.currentPosition.coerceAtLeast(0L)
+        playbackStates[id] = PlaybackState(
+            id = id,
+            url = url,
+            positionMs = position,
+            durationMs = durationMs,
+            framePositionMs = position,
+            muted = mutedOverride ?: sharedMuted ?: playbackStates[id]?.muted ?: true,
+            paused = !currentPlayer.isPlaying && !currentPlayer.playWhenReady
+        )
+    }
+
+    private fun requirePlayer(): ExoPlayer {
+        return player ?: ExoPlayer.Builder(checkNotNull(appContext) { "VideoPlaybackPool is not initialized." })
+            .build()
+            .also { player = it }
     }
 
     private fun resolveMuted(fallback: Boolean): Boolean {
@@ -182,19 +295,24 @@ object VideoPlaybackPool {
         return muted
     }
 
-    private fun saveActiveProgress() {
-        val id = activeVideoId ?: return
-        val currentPlayer = player ?: return
-        playbackPositions[id] = currentPlayer.currentPosition
-        val duration = currentPlayer.duration
-        if (duration != C.TIME_UNSET && duration > 0L) {
-            playbackDurations[id] = duration
-        }
+    private fun playableVideoUrl(videoUrl: String): String {
+        val context = appContext ?: return videoUrl
+        return RemoteVideoCache.playableUrl(context, videoUrl) ?: videoUrl
     }
 
-    private fun requirePlayer(): ExoPlayer {
-        return player ?: ExoPlayer.Builder(checkNotNull(appContext) { "VideoPlaybackPool is not initialized." })
-            .build()
-            .also { player = it }
-    }
+    private data class ViewBinding(
+        val id: Long,
+        val url: String,
+        val muted: Boolean
+    )
+
+    private data class PlaybackState(
+        val id: Long,
+        val url: String,
+        val positionMs: Long,
+        val durationMs: Long,
+        val framePositionMs: Long,
+        val muted: Boolean,
+        val paused: Boolean
+    )
 }

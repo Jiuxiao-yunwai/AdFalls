@@ -12,10 +12,12 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <View
+    <ImageView
         android:id="@+id/ad_media"
         android:layout_width="match_parent"
         android:layout_height="190dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
         tools:background="#75CDB5" />
 
     <TextView

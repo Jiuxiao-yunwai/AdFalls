@@ -17,6 +17,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
+import com.example.adfalls.cache.AdMediaPrefetcher
+import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
@@ -58,6 +60,9 @@ class MainActivity : ComponentActivity() {
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var horizontalSwipeActive = false
+    private var verticalSwipeActive = false
+    private var transitionPauseHandled = false
+    private var transitionLaunchInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,6 +111,7 @@ class MainActivity : ComponentActivity() {
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 registerVisibleImpressions()
+                prefetchUpcomingMedia()
                 scheduleFeedVideoAutoplay()
                 val state = viewModel.uiState.value
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
@@ -114,11 +120,26 @@ class MainActivity : ComponentActivity() {
                     state.searchText.isBlank() &&
                     state.selectedTag == null &&
                     dy > 0 &&
-                    lastVisible >= adapter.itemCount - 2
+                    shouldPreloadMore(state, lastVisible)
                 ) {
                     viewModel.loadMore()
                 }
             }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    registerVisibleImpressions()
+                    prefetchUpcomingMedia()
+                    scheduleFeedVideoAutoplay()
+                }
+            }
+        })
+        recyclerView.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                recyclerView.post { scheduleFeedVideoAutoplay() }
+            }
+
+            override fun onChildViewDetachedFromWindow(view: View) = Unit
         })
 
         swipeRefresh = findViewById(R.id.swipe_refresh)
@@ -149,21 +170,24 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        transitionPauseHandled = false
+        transitionLaunchInProgress = false
         if (::recyclerView.isInitialized) {
             recyclerView.post { scheduleFeedVideoAutoplay() }
         }
     }
 
     override fun onPause() {
-        pauseScheduledFeedVideo()
+        if (!transitionPauseHandled) {
+            pauseFeedVideosKeepingFrame()
+        }
         super.onPause()
     }
 
     private fun createAdapter(): AdAdapter {
         return AdAdapter(
             onCardClick = { ad ->
-                viewModel.registerClick(ad.id)
-                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
+                openDetailPage(ad)
             },
             onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
             onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
@@ -229,8 +253,13 @@ class MainActivity : ComponentActivity() {
             }
             scrollToTopAfterRefreshIfNeeded(state)
             registerVisibleImpressions()
-            recyclerView.post { scheduleFeedVideoAutoplay() }
+            prefetchUpcomingMedia()
+            recyclerView.post {
+                scheduleFeedVideoAutoplay()
+                recyclerView.post { scheduleFeedVideoAutoplay() }
+            }
         }
+        scheduleRefreshScrollFallback(state)
     }
 
     private fun configureRecyclerViewForFeed(target: RecyclerView) {
@@ -245,10 +274,18 @@ class MainActivity : ComponentActivity() {
                 touchDownX = event.x
                 touchDownY = event.y
                 horizontalSwipeActive = false
+                verticalSwipeActive = false
                 swipeRefresh.isEnabled = true
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (verticalSwipeActive) return
+                if (!horizontalSwipeActive && isVerticalScrollIntent(event)) {
+                    verticalSwipeActive = true
+                    swipeRefresh.isEnabled = true
+                    view.parent.requestDisallowInterceptTouchEvent(false)
+                    return
+                }
                 if (horizontalSwipeActive || isHorizontalSwipeIntent(event)) {
                     horizontalSwipeActive = true
                     swipeRefresh.isEnabled = false
@@ -261,12 +298,14 @@ class MainActivity : ComponentActivity() {
                     switchChannelForSwipe(event.x - touchDownX)
                 }
                 horizontalSwipeActive = false
+                verticalSwipeActive = false
                 swipeRefresh.isEnabled = true
                 view.parent.requestDisallowInterceptTouchEvent(false)
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 horizontalSwipeActive = false
+                verticalSwipeActive = false
                 swipeRefresh.isEnabled = true
                 view.parent.requestDisallowInterceptTouchEvent(false)
             }
@@ -280,6 +319,13 @@ class MainActivity : ComponentActivity() {
             abs(dx) > abs(dy) * SWIPE_DIRECTION_RATIO
     }
 
+    private fun isVerticalScrollIntent(event: MotionEvent): Boolean {
+        val dx = event.x - touchDownX
+        val dy = event.y - touchDownY
+        return abs(dy) >= VERTICAL_LOCK_DISTANCE &&
+            abs(dy) > abs(dx) * VERTICAL_LOCK_DIRECTION_RATIO
+    }
+
     private fun switchChannelForSwipe(dx: Float) {
         if (abs(dx) < SWIPE_DISTANCE) return
         val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
@@ -290,19 +336,41 @@ class MainActivity : ComponentActivity() {
 
     private fun scrollToTopAfterRefreshIfNeeded(state: FeedUiState) {
         if (state.refreshVersion <= handledRefreshVersion) return
-        handledRefreshVersion = state.refreshVersion
         val refreshChannel = pendingRefreshScrollChannel
         pendingRefreshScrollChannel = null
+        handledRefreshVersion = state.refreshVersion
         if (refreshChannel != state.activeChannel) {
             resetRefreshFade()
             return
         }
 
         listStates.remove(state.activeChannel)
-        recyclerView.stopScroll()
-        layoutManager.scrollToPositionWithOffset(0, 0)
         scheduledFeedVideoId = null
-        playRefreshFadeIn()
+        forceScrollToTopAfterRefresh()
+    }
+
+    private fun scheduleRefreshScrollFallback(state: FeedUiState) {
+        if (state.refreshVersion <= handledRefreshVersion) return
+        if (pendingRefreshScrollChannel != state.activeChannel) return
+        recyclerView.post { scrollToTopAfterRefreshIfNeeded(state) }
+    }
+
+    private fun forceScrollToTopAfterRefresh() {
+        recyclerView.stopScroll()
+        recyclerView.clearFocus()
+        layoutManager.scrollToPositionWithOffset(0, 0)
+        recyclerView.post {
+            recyclerView.stopScroll()
+            layoutManager.scrollToPositionWithOffset(0, 0)
+            recyclerView.postOnAnimation {
+                recyclerView.stopScroll()
+                layoutManager.scrollToPositionWithOffset(0, 0)
+                playRefreshFadeIn()
+                registerVisibleImpressions()
+                prefetchUpcomingMedia()
+                scheduleFeedVideoAutoplay()
+            }
+        }
     }
 
     private fun startRefreshFadeOut() {
@@ -339,6 +407,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun shouldPreloadMore(state: FeedUiState, lastVisiblePosition: Int): Boolean {
+        if (state.ads.isEmpty()) return false
+        val lastAdPosition = state.ads.lastIndex
+        val remaining = lastAdPosition - lastVisiblePosition
+        return remaining <= AD_INFO_PRELOAD_THRESHOLD
+    }
+
     private fun updateFilterAndEmptyState(state: FeedUiState) {
         val tag = state.selectedTag
         tagFilterBar.visibility = if (tag == null) View.GONE else View.VISIBLE
@@ -369,11 +444,22 @@ class MainActivity : ComponentActivity() {
         viewModel.pauseVideosOutside(visibleAdIds)
     }
 
+    private fun prefetchUpcomingMedia() {
+        if (adapter.currentList.isEmpty()) return
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
+        val start = firstVisible.takeIf { it >= 0 } ?: 0
+        if (start > adapter.currentList.lastIndex) return
+        val visibleEnd = lastVisible.takeIf { it >= start } ?: start
+        val end = (visibleEnd + MEDIA_PREFETCH_AHEAD_COUNT).coerceAtMost(adapter.currentList.lastIndex)
+        AdMediaPrefetcher.prefetch(lifecycleScope, this, adapter.currentList.subList(start, end + 1))
+    }
+
     private fun scheduleFeedVideoAutoplay() {
         val candidate = findFirstFullyVisibleVideo()
         if (candidate != null) {
             val (ad, holder) = candidate
-            val playerView = holder.getPlayerView() ?: return
+            val playerView = holder.ensurePlayerViewForAutoplay() ?: return
             if (scheduledFeedVideoId != ad.id || !ad.playing) {
                 viewModel.autoPlayVisibleVideo(ad, playerView)
             }
@@ -391,6 +477,35 @@ class MainActivity : ComponentActivity() {
     private fun pauseScheduledFeedVideo() {
         scheduledFeedVideoId?.let(viewModel::pauseVideoIfGone)
         scheduledFeedVideoId = null
+    }
+
+    private fun pauseFeedVideosKeepingFrame() {
+        viewModel.pauseCurrentVideosKeepingFrame()
+        scheduledFeedVideoId = null
+    }
+
+    private fun pauseForOutgoingTransitionThen(block: () -> Unit) {
+        if (transitionLaunchInProgress) return
+        transitionLaunchInProgress = true
+        transitionPauseHandled = true
+        scheduledFeedVideoId = null
+        lifecycleScope.launch {
+            viewModel.pauseCurrentVideosKeepingFrameAndWait()
+            block()
+        }
+    }
+
+    private fun openDetailPage(ad: AdItem) {
+        val shouldAutoPlayInDetail = ad.type == AdCardType.VIDEO &&
+            (VideoPlaybackPool.isPlaybackActive(ad.id, ad.videoUrl) || ad.playing)
+        viewModel.registerClick(ad.id)
+        pauseForOutgoingTransitionThen {
+            startActivity(
+                Intent(this, DetailActivity::class.java)
+                    .putExtra(DetailActivity.EXTRA_AD_ID, ad.id)
+                    .putExtra(DetailActivity.EXTRA_AUTO_PLAY_VIDEO, shouldAutoPlayInDetail)
+            )
+        }
     }
 
     private fun findFirstFullyVisibleVideo(): Pair<AdItem, AdAdapter.AdViewHolder>? {
@@ -539,14 +654,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openSearchPage() {
-        startActivity(
-            Intent(this, SearchActivity::class.java)
-                .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
-        )
+        pauseForOutgoingTransitionThen {
+            startActivity(
+                Intent(this, SearchActivity::class.java)
+                    .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
+            )
+        }
     }
 
     private fun openAiChatPage() {
-        startActivity(Intent(this, AiChatActivity::class.java))
+        pauseForOutgoingTransitionThen {
+            startActivity(Intent(this, AiChatActivity::class.java))
+        }
     }
 
     private fun View.applyMainResponsiveHorizontalPadding() {
@@ -558,12 +677,16 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val SWIPE_DISTANCE = 90
-        private const val SWIPE_INTENT_DISTANCE_RATIO = 0.45f
-        private const val SWIPE_DIRECTION_RATIO = 1.25f
+        private const val SWIPE_DISTANCE = 140
+        private const val SWIPE_INTENT_DISTANCE_RATIO = 0.6f
+        private const val SWIPE_DIRECTION_RATIO = 1.8f
+        private const val VERTICAL_LOCK_DISTANCE = 32
+        private const val VERTICAL_LOCK_DIRECTION_RATIO = 1.15f
         private const val PAGE_SWITCH_COOLDOWN_MS = 500L
         private const val PAGE_SWITCH_DURATION = 320L
         private const val PAGE_SWITCH_GAP_DP = 10
+        private const val AD_INFO_PRELOAD_THRESHOLD = 5
+        private const val MEDIA_PREFETCH_AHEAD_COUNT = 5
         private const val FEED_ITEM_CACHE_SIZE = 6
         private const val SNAPSHOT_EXTRA_ITEMS = 2
         private const val REFRESH_FADE_OUT_ALPHA = 0.35f

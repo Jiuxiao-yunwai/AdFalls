@@ -106,9 +106,9 @@ class FeedViewModel : ViewModel() {
     fun loadMore() {
         val state = uiState.value
         if (state.loadingMore || state.searchText.isNotBlank() || state.selectedTag != null) return
+        loadingMore.value = true
 
         viewModelScope.launch {
-            loadingMore.value = true
             try {
                 endReached.value = !AdRepository.loadMore(activeChannel.value)
             } finally {
@@ -148,6 +148,17 @@ class FeedViewModel : ViewModel() {
         viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(adId) }
     }
 
+    fun pauseCurrentVideosKeepingFrame() {
+        viewModelScope.launch { pauseCurrentVideosKeepingFrameAndWait() }
+    }
+
+    suspend fun pauseCurrentVideosKeepingFrameAndWait() {
+        VideoPlaybackPool.pauseActiveAndRelease()
+        uiState.value.ads
+            .filter { it.playing || VideoPlaybackPool.hasActiveFrame(it.id, it.videoUrl) }
+            .forEach { ad -> VideoPlaybackPool.pauseFromFeed(ad.id) }
+    }
+
     private fun pauseCurrentVideos() {
         uiState.value.ads
             .filter { it.playing }
@@ -169,7 +180,7 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleVideoPlay(ad: AdItem) {
-        if (ad.playing) {
+        if (VideoPlaybackPool.willPauseOnToggle(ad.id, ad.playing)) {
             manuallyPausedVideoIds.add(ad.id)
         } else {
             manuallyPausedVideoIds.remove(ad.id)

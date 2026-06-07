@@ -60,11 +60,13 @@
                 tools:text="高性价比数码配件组合，适合校园通勤和学习场景。" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:id="@+id/ad_media"
             android:layout_width="116dp"
             android:layout_height="132dp"
             android:layout_marginStart="10dp"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
             tools:background="#75CDB5" />
     </LinearLayout>
 
