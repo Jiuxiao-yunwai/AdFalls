@@ -209,15 +209,33 @@ EXPOSURE_DASHBOARD_HTML = """
       font-weight: 600;
     }
     .table-wrap {
-      overflow: auto;
+      width: 100%;
+      max-width: calc(100vw - 56px);
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      touch-action: pan-x pan-y;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
+      scrollbar-gutter: stable;
+    }
+    .table-wrap::-webkit-scrollbar {
+      height: 10px;
+    }
+    .table-wrap::-webkit-scrollbar-thumb {
+      background: #b8c3cf;
+      border-radius: 999px;
+    }
+    .table-wrap::-webkit-scrollbar-track {
+      background: #eef2f5;
+      border-radius: 999px;
     }
     table {
-      width: 100%;
+      width: max-content;
       border-collapse: collapse;
-      min-width: 1320px;
+      min-width: 1760px;
     }
     th, td {
       padding: 11px 12px;

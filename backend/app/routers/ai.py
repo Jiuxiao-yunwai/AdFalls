@@ -74,8 +74,5 @@ def build_local_ad_analysis(ad) -> str:
     tags = "、".join(crud.split_csv(ad.tags)) or "该品类"
     return (
         f"这条广告更适合关注{tags}的用户。\n\n"
-        f"核心卖点是：{ad.summary}\n\n"
-        f"从信息流表现看，标题“{ad.title}”比较适合作为第一眼吸引点，"
-        "内容需要快速说明使用场景、优惠或体验价值，让用户在滑动时能马上判断是否相关。\n\n"
-        "优化建议：可以把目标人群、具体场景和一个明确行动点放在前半句，减少泛泛描述。"
+        f"核心卖点是：{ad.summary}"
     )
