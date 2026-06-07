@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.ui.config.ServerConfigActivity
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.feed.AdAdapter
 import com.example.adfalls.ui.metrics.AdMetricsActivity
@@ -31,6 +32,7 @@ class SearchActivity : ComponentActivity() {
     private lateinit var input: EditText
     private lateinit var emptyState: TextView
     private var metricsLaunchArmed = true
+    private var serverConfigLaunchArmed = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,7 +86,15 @@ class SearchActivity : ComponentActivity() {
                     }
                     return
                 }
+                if (text.trim().equals(SERVER_CONFIG_ENTRY_QUERY, ignoreCase = true)) {
+                    if (serverConfigLaunchArmed) {
+                        serverConfigLaunchArmed = false
+                        startActivity(Intent(this@SearchActivity, ServerConfigActivity::class.java))
+                    }
+                    return
+                }
                 metricsLaunchArmed = true
+                serverConfigLaunchArmed = true
                 viewModel.updateSearchText(text)
             }
 
@@ -120,6 +130,7 @@ class SearchActivity : ComponentActivity() {
     companion object {
         const val EXTRA_CHANNEL = "extra_channel"
         private const val METRICS_ENTRY_QUERY = "dancebyte"
+        private const val SERVER_CONFIG_ENTRY_QUERY = "worldhello"
     }
 
     private fun View.applySearchResponsiveHorizontalPadding() {

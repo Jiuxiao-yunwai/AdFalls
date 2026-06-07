@@ -18,6 +18,7 @@ data class AdItem(
     val type: AdCardType,
     val title: String,
     val brand: String,
+    val coverUrl: String? = null,
     val videoUrl: String? = null,
     val summary: String,
     val detail: String,

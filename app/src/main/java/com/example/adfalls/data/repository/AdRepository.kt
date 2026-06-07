@@ -295,6 +295,19 @@ object AdRepository {
         dao().updateAllVideoMuted(muted)
     }
 
+    suspend fun clearLocalAdData() = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            userSession = null
+            visibleIds.clear()
+            requestedIds.clear()
+            nextCursors.clear()
+            hasMoreByChannel.clear()
+            exposedIds.clear()
+            dao().deleteAllAds()
+            bumpVisibleRevision()
+        }
+    }
+
     private fun dao(): AdDao {
         return checkNotNull(adDao) { "AdRepository must be initialized from AdFallsApp before use." }
     }

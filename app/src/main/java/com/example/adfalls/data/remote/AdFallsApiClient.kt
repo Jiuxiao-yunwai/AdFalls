@@ -1,6 +1,6 @@
 package com.example.adfalls.data.remote
 
-import com.example.adfalls.BuildConfig
+import com.example.adfalls.config.ServerConfig
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdItem
@@ -52,7 +52,8 @@ data class BackendAdDto(
             type = normalizedType,
             title = title,
             brand = "广告推荐",
-            videoUrl = videoUrl?.takeIf { it.isNotBlank() },
+            coverUrl = coverUrl?.takeIf { it.isNotBlank() }?.let(::resolveMediaUrl),
+            videoUrl = videoUrl?.takeIf { it.isNotBlank() }?.let(::resolveMediaUrl),
             summary = summary,
             detail = content?.takeIf { it.isNotBlank() } ?: summary,
             tags = tags,
@@ -71,6 +72,14 @@ data class BackendAdDto(
             0xFF3ACAD6.toInt()
         )
         return palette[(id.hashCode().absoluteValue) % palette.size]
+    }
+
+    private fun resolveMediaUrl(value: String): String {
+        if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("file:")) {
+            return value
+        }
+        val apiBaseUrl = ServerConfig.getBaseUrl().trimEnd('/')
+        return "$apiBaseUrl/${value.trimStart('/')}"
     }
 }
 
@@ -98,7 +107,6 @@ data class BackendAdMetricDto(
 
 object AdFallsApiClient {
     private const val DEFAULT_TIMEOUT_MS = 60_000
-    private val baseUrl = BuildConfig.ADFALLS_API_BASE_URL.trimEnd('/')
 
     suspend fun login(username: String = "test", password: String = "123456"): BackendUserSession = withContext(Dispatchers.IO) {
         val data = requestJson(
@@ -246,6 +254,7 @@ object AdFallsApiClient {
         query: Map<String, String?> = emptyMap(),
         body: JSONObject? = null
     ): JSONObject {
+        val baseUrl = ServerConfig.getBaseUrl().trimEnd('/')
         val url = URL("$baseUrl$path${query.toQueryString()}")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = method
