@@ -1,13 +1,12 @@
 package com.example.adfalls.ui.aichat
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -16,6 +15,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
+import com.example.adfalls.ui.common.applyScreenPercentHorizontalPadding
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.viewmodel.AiChatViewModel
 import kotlinx.coroutines.launch
@@ -25,14 +25,15 @@ class AiChatActivity : ComponentActivity() {
     private lateinit var adapter: AiChatAdapter
     private lateinit var messageList: RecyclerView
     private lateinit var input: EditText
-    private lateinit var sendButton: TextView
+    private lateinit var sendButton: View
     private var initialQuerySubmitted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_ai_chat)
+        findViewById<View>(R.id.ai_chat_root).applyScreenPercentHorizontalPadding(AI_CHAT_SIDE_PERCENT)
 
         viewModel = ViewModelProvider.create(this)[AiChatViewModel::class]
 
@@ -50,7 +51,7 @@ class AiChatActivity : ComponentActivity() {
         input = findViewById(R.id.ai_chat_input)
         sendButton = findViewById(R.id.ai_chat_send)
 
-        findViewById<TextView>(R.id.ai_chat_back).setOnClickListener { finish() }
+        findViewById<View>(R.id.ai_chat_back).setOnClickListener { finish() }
         sendButton.setOnClickListener { viewModel.sendMessage() }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -95,6 +96,7 @@ class AiChatActivity : ComponentActivity() {
                 initialQuerySubmitted = true
                 viewModel.submitInitialQueryOnce(
                     query = initialQuery,
+                    aiPrompt = intent.getStringExtra(EXTRA_INITIAL_AI_PROMPT),
                     contextAdId = intent.getLongExtra(EXTRA_CONTEXT_AD_ID, -1L).takeIf { it > 0L }
                 )
             }
@@ -108,7 +110,9 @@ class AiChatActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_INITIAL_QUERY = "extra_initial_query"
+        const val EXTRA_INITIAL_AI_PROMPT = "extra_initial_ai_prompt"
         const val EXTRA_CONTEXT_AD_ID = "extra_context_ad_id"
         private const val STATE_INITIAL_QUERY_SUBMITTED = "state_initial_query_submitted"
+        private const val AI_CHAT_SIDE_PERCENT = 0.14f
     }
 }

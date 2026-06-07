@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#3A2020" />
+    <solid android:color="@color/app_error_surface" />
     <stroke
         android:width="1dp"
-        android:color="#7A3535" />
-    <corners android:radius="14dp" />
+        android:color="@color/app_error_outline" />
+    <corners
+        android:bottomLeftRadius="0dp"
+        android:bottomRightRadius="24dp"
+        android:topLeftRadius="24dp"
+        android:topRightRadius="24dp" />
 </shape>

@@ -2,8 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:paddingTop="7dp"
+    android:paddingBottom="7dp">
 
     <TextView
         android:id="@+id/chat_message_text"
@@ -11,13 +11,15 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start"
         android:background="@drawable/bg_chat_assistant_bubble"
+        android:includeFontPadding="false"
         android:lineSpacingExtra="2dp"
-        android:maxWidth="280dp"
+        android:minHeight="44dp"
+        android:minWidth="104dp"
         android:paddingStart="14dp"
-        android:paddingTop="10dp"
+        android:paddingTop="11dp"
         android:paddingEnd="14dp"
-        android:paddingBottom="10dp"
+        android:paddingBottom="11dp"
         android:text="正在思考..."
-        android:textColor="#CFCFCF"
+        android:textColor="@color/app_text_on_dark_secondary"
         android:textSize="15sp" />
 </FrameLayout>

@@ -6,10 +6,12 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -23,6 +25,7 @@ import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
 import com.example.adfalls.ui.aichat.AiChatActivity
+import com.example.adfalls.ui.common.RemoteImageLoader
 import com.example.adfalls.viewmodel.DetailUiState
 import com.example.adfalls.viewmodel.DetailViewModel
 import kotlinx.coroutines.launch
@@ -30,6 +33,7 @@ import kotlinx.coroutines.launch
 class DetailActivity : ComponentActivity() {
     private lateinit var viewModel: DetailViewModel
     private lateinit var mediaContainer: FrameLayout
+    private lateinit var mediaImage: ImageView
     private lateinit var playerView: PlayerView
     private val progressHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
@@ -37,16 +41,24 @@ class DetailActivity : ComponentActivity() {
     private var hideControlsRunnable: Runnable? = null
     private var keepControlsVisibleOnNextRender = false
     private var lastRenderedAd: AdItem? = null
+    private var pendingAutoPlayVideo = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_detail)
         viewModel = ViewModelProvider.create(this)[DetailViewModel::class]
+        pendingAutoPlayVideo = intent.getBooleanExtra(EXTRA_AUTO_PLAY_VIDEO, false)
         viewModel.loadAd(intent.getLongExtra(EXTRA_AD_ID, -1L))
         mediaContainer = findViewById(R.id.detail_media)
-        playerView = PlayerView(this).apply {
+        mediaImage = findViewById(R.id.detail_media_image)
+        playerView = LayoutInflater.from(this).inflate(
+            R.layout.view_ad_player,
+            mediaContainer,
+            false
+        ) as PlayerView
+        playerView.apply {
             useController = false
             useArtwork = false
             layoutParams = FrameLayout.LayoutParams(
@@ -54,7 +66,8 @@ class DetailActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
-        mediaContainer.addView(playerView, 0)
+        mediaContainer.addView(playerView)
+        playerView.bringToFront()
 
         findViewById<View>(R.id.back_button).setOnClickListener { finish() }
 
@@ -67,7 +80,20 @@ class DetailActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.playVideo()
+        if (::playerView.isInitialized) {
+            lastRenderedAd?.let { ad ->
+                if (ad.type == AdCardType.VIDEO) {
+                    VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
+                    val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+                    playerView.visibility = if (shouldShowPlayer) {
+                        View.VISIBLE
+                    } else {
+                        View.INVISIBLE
+                    }
+                    mediaImage.visibility = View.VISIBLE
+                }
+            }
+        }
     }
 
     override fun onPause() {
@@ -101,17 +127,25 @@ class DetailActivity : ComponentActivity() {
         findViewById<TextView>(R.id.detail_body).text = ad.detail
         findViewById<TextView>(R.id.detail_tags).text = ad.tags.joinToString("  ") { "#$it" }
         findViewById<TextView>(R.id.detail_stats).text =
-            "曝光 ${ad.impressions} · 点击 ${ad.clicks} · 点赞 ${ad.likes} · 分享 ${ad.shares}"
+            "点赞 ${ad.likes} · 收藏 ${if (ad.favorited) 1 else 0}"
 
         mediaContainer.background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(ad.mediaColor, darken(ad.mediaColor))
-        ).apply { cornerRadius = 22f }
+        ).apply { cornerRadius = 10f * resources.displayMetrics.density }
+        RemoteImageLoader.load(lifecycleScope, mediaImage, ad.coverUrl, ad.mediaColor)
         resizeMedia(ad.type)
         playerView.useController = false
         if (ad.type == AdCardType.VIDEO) {
-            playerView.visibility = View.VISIBLE
             VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
+            val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+            playerView.visibility = if (shouldShowPlayer) {
+                View.VISIBLE
+            } else {
+                View.INVISIBLE
+            }
+            mediaImage.visibility = View.VISIBLE
+            playPendingVideoIfNeeded(ad)
             startProgressUpdates(ad.id)
             findViewById<View>(R.id.detail_mute).apply {
                 animate().cancel()
@@ -130,7 +164,8 @@ class DetailActivity : ComponentActivity() {
                 showPlaybackControls(scheduleHide = true)
             }
         } else {
-            playerView.visibility = View.GONE
+            mediaImage.visibility = View.VISIBLE
+            playerView.visibility = View.INVISIBLE
             stopProgressUpdates()
             keepControlsVisibleOnNextRender = false
             hidePlaybackControls(animate = false)
@@ -138,16 +173,19 @@ class DetailActivity : ComponentActivity() {
             VideoPlaybackPool.detach(playerView)
         }
 
-        val like = findViewById<TextView>(R.id.detail_like)
-        val favorite = findViewById<TextView>(R.id.detail_favorite)
-        val share = findViewById<TextView>(R.id.detail_share)
+        val like = findViewById<ImageButton>(R.id.detail_like)
+        val favorite = findViewById<ImageButton>(R.id.detail_favorite)
+        val share = findViewById<ImageButton>(R.id.detail_share)
         val video = findViewById<ImageButton>(R.id.detail_video)
         val mute = findViewById<ImageButton>(R.id.detail_mute)
         val progressPanel = findViewById<View>(R.id.detail_progress_panel)
+        progressPanel.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
 
-        like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
-        favorite.text = if (ad.favorited) "已收藏" else "收藏"
-        share.text = "分享"
+        like.isSelected = ad.liked
+        favorite.isSelected = ad.favorited
+        like.contentDescription = if (ad.liked) "取消点赞，当前 ${ad.likes} 个赞" else "点赞，当前 ${ad.likes} 个赞"
+        favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
+        share.contentDescription = "分享，当前 ${ad.shares} 次分享"
         video.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
         mute.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
         video.contentDescription = if (ad.playing) "暂停" else "播放"
@@ -162,14 +200,25 @@ class DetailActivity : ComponentActivity() {
         favorite.setOnClickListener { viewModel.toggleFavorite() }
         share.setOnClickListener { viewModel.share() }
         findViewById<View>(R.id.detail_ask_ai).setOnClickListener {
-            startActivity(
-                Intent(this, AiChatActivity::class.java)
-                    .putExtra(
-                        AiChatActivity.EXTRA_INITIAL_QUERY,
-                        "请分析一下这条广告适合什么人，以及它的核心卖点：${ad.title}"
-                    )
-                    .putExtra(AiChatActivity.EXTRA_CONTEXT_AD_ID, ad.id)
-            )
+            lifecycleScope.launch {
+                VideoPlaybackPool.pauseActiveAndRelease()
+                startActivity(
+                    Intent(this@DetailActivity, AiChatActivity::class.java)
+                        .putExtra(
+                            AiChatActivity.EXTRA_INITIAL_QUERY,
+                            "向我介绍：${ad.title}"
+                        )
+                        .putExtra(
+                            AiChatActivity.EXTRA_INITIAL_AI_PROMPT,
+                            "你是一个广告推荐助手，现在你要以一个助手的身份，向用户介绍这个产品。" +
+                                "请只根据当前广告信息，面向普通用户简短介绍这个产品。" +
+                                "直接说明它是什么、主要用途和一两个亮点即可。" +
+                                "不要写开场白，不要分析广告投放，不要评价或改写文案，不要提出优化建议，也不要说“文案可以更生动一点”等类似内容。" +
+                                "产品标题：${ad.title}"
+                        )
+                        .putExtra(AiChatActivity.EXTRA_CONTEXT_AD_ID, ad.id)
+                )
+            }
         }
         mediaContainer.setOnClickListener {
             val currentAd = lastRenderedAd ?: ad
@@ -203,6 +252,16 @@ class DetailActivity : ComponentActivity() {
         mute.animate().cancel()
         mute.alpha = 1f
         mute.visibility = View.VISIBLE
+        findViewById<View>(R.id.detail_progress_panel).visibility = View.VISIBLE
+        VideoPlaybackPool.attach(playerView, ad.id, ad.videoUrl, ad.playing, ad.muted)
+        val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+        playerView.visibility = if (shouldShowPlayer) {
+            View.VISIBLE
+        } else {
+            View.INVISIBLE
+        }
+        mediaImage.visibility = View.VISIBLE
+        playPendingVideoIfNeeded(ad)
 
         if (ad.playing) {
             if (keepControlsVisibleOnNextRender) {
@@ -225,6 +284,15 @@ class DetailActivity : ComponentActivity() {
         }
         showPlaybackControls(scheduleHide = true)
         viewModel.toggleVideoPlay()
+    }
+
+    private fun playPendingVideoIfNeeded(ad: AdItem) {
+        if (!pendingAutoPlayVideo) return
+        pendingAutoPlayVideo = false
+        mediaImage.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            VideoPlaybackPool.playInView(ad.id, ad.videoUrl, ad.muted, playerView)
+        }
     }
 
     private fun startProgressUpdates(adId: Long) {
@@ -324,6 +392,7 @@ class DetailActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_AD_ID = "extra_ad_id"
+        const val EXTRA_AUTO_PLAY_VIDEO = "extra_auto_play_video"
         private const val VIDEO_PROGRESS_INTERVAL_MS = 33L
         private const val VIDEO_PROGRESS_MAX = 10000L
         private const val MEDIA_RATIO_9_16 = 9f / 16f

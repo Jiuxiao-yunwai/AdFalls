@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_metrics_panel"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/metric_rank"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_metrics_stat"
+            android:gravity="center"
+            android:textColor="@color/app_accent_strong"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            tools:text="01" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/metric_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/app_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="城市夜跑能量补给" />
+
+            <TextView
+                android:id="@+id/metric_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/app_text_tertiary"
+                android:textSize="12sp"
+                tools:text="featured · VIDEO · #运动 #夜跑" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/metric_ctr"
+            android:layout_width="66dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_metrics_stat"
+            android:gravity="center"
+            android:textColor="@color/app_text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            tools:text="8.42%" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_metrics_bar_track">
+
+        <View
+            android:id="@+id/metric_exposure_bar"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_metrics_bar_fill" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/metric_exposures"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/app_text_primary"
+            android:textSize="12sp"
+            tools:text="曝光 486" />
+
+        <TextView
+            android:id="@+id/metric_clicks"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/app_text_primary"
+            android:textSize="12sp"
+            tools:text="点击 42" />
+
+        <TextView
+            android:id="@+id/metric_interactions"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/app_text_primary"
+            android:textSize="12sp"
+            tools:text="互动 91" />
+    </LinearLayout>
+</LinearLayout>

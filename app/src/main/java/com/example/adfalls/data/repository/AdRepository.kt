@@ -9,6 +9,8 @@ import com.example.adfalls.data.local.toModel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.data.remote.AdFallsApiClient
+import com.example.adfalls.data.remote.BackendUserSession
 import com.example.adfalls.data.remote.FakeAdRemoteDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 object AdRepository {
-    private const val PAGE_SIZE = 6
+    private const val PAGE_SIZE = 10
     private const val FIXED_AD_COUNT = 50
     private const val FIRST_AD_TITLE = "城市夜跑能量补给"
     private const val OLD_SAMPLE_VIDEO_URL = "https://storage.googleapis.com/exoplayer-test-media-0/BigBuckBunny_320x180.mp4"
@@ -32,11 +34,14 @@ object AdRepository {
 
     private var adDao: AdDao? = null
     private var appContext: Context? = null
+    private var userSession: BackendUserSession? = null
     private var sampleVideoUrls: List<String> = emptyList()
     private val operationMutex = Mutex()
     private val visibleRevision = MutableStateFlow(0)
     private val visibleIds = mutableMapOf<AdChannel, MutableList<Long>>()
     private val requestedIds = mutableMapOf<AdChannel, MutableSet<Long>>()
+    private val nextCursors = mutableMapOf<AdChannel, String>()
+    private val hasMoreByChannel = mutableMapOf<AdChannel, Boolean>()
     private val exposedIds = mutableSetOf<Long>()
     private val palette = listOf(
         Color.rgb(78, 164, 255),
@@ -52,6 +57,8 @@ object AdRepository {
         appContext = context.applicationContext
         adDao = AppDatabase.getInstance(context).adDao()
     }
+
+    internal fun isInitialized(): Boolean = adDao != null
 
     fun observeAdsByChannel(channel: AdChannel): Flow<List<AdItem>> {
         return flow {
@@ -86,6 +93,17 @@ object AdRepository {
         dao().getAdById(id)?.toModel()
     }
 
+    suspend fun refreshAdDetail(id: Long) = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        runCatching {
+            val session = ensureUserSession()
+            val localChannel = dao().getAdById(id)?.toModel()?.channel ?: AdChannel.FEATURED
+            val ad = AdFallsApiClient.fetchAdDetail(id, session.userId).toModel(localChannel)
+            upsertPreservingLocalState(listOf(ad))
+            AdFallsApiClient.recordBehavior(session.userId, id, ad.channel, "DETAIL_VIEW")
+        }
+    }
+
     suspend fun findAds(ids: List<Long>): List<AdItem> = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext emptyList()
         seedIfNeeded()
@@ -93,13 +111,69 @@ object AdRepository {
         ids.mapNotNull(adsById::get)
     }
 
+    suspend fun listAds(channel: AdChannel): List<AdItem> = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        dao().getAdsByChannel(channel.name).map { it.toModel() }
+    }
+
     suspend fun searchAds(channel: AdChannel, query: String): List<AdItem> = withContext(Dispatchers.IO) {
         seedIfNeeded()
-        FakeAdRemoteDataSource.searchAds(
-            dao = dao(),
-            channel = channel,
-            query = query
-        )
+        runCatching {
+            val session = ensureUserSession()
+            val page = AdFallsApiClient.searchAds(
+                keyword = query,
+                cursor = null,
+                size = 50,
+                userId = session.userId
+            )
+            upsertPreservingLocalState(page.items.map { it.toModel(channel) })
+        }.getOrElse {
+            FakeAdRemoteDataSource.searchAds(
+                dao = dao(),
+                channel = channel,
+                query = query
+            )
+        }
+    }
+
+    suspend fun chatSearch(query: String): Pair<String, List<AdItem>> = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        runCatching {
+            val session = ensureUserSession()
+            val (reply, page) = AdFallsApiClient.chatSearch(
+                userId = session.userId,
+                message = query,
+                cursor = null,
+                size = 5
+            )
+            reply to upsertPreservingLocalState(page.items.map { it.toModel(AdChannel.FEATURED) })
+        }.getOrElse {
+            val fallback = FakeAdRemoteDataSource.searchAds(
+                dao = dao(),
+                channel = AdChannel.FEATURED,
+                query = query
+            ).take(5)
+            "已为你找到相关广告。" to fallback
+        }
+    }
+
+    suspend fun analyzeAd(adId: Long, query: String): String = withContext(Dispatchers.IO) {
+        seedIfNeeded()
+        val ad = findAd(adId)
+        runCatching {
+            val session = ensureUserSession()
+            AdFallsApiClient.analyzeAd(
+                userId = session.userId,
+                adId = adId,
+                message = query
+            )
+        }.getOrElse {
+            if (ad == null) {
+                "没有找到这条广告的详情，暂时无法完成分析。"
+            } else {
+                buildLocalAdAnalysis(ad)
+            }
+        }
     }
 
     suspend fun refresh(channel: AdChannel): Boolean = withContext(Dispatchers.IO) {
@@ -129,11 +203,30 @@ object AdRepository {
             val liked = !ad.liked
             val likes = (ad.likes + if (liked) 1 else -1).coerceAtLeast(0)
             dao().updateLike(id, liked, likes)
+            runCatching {
+                val session = ensureUserSession()
+                if (liked) {
+                    AdFallsApiClient.like(session.userId, id)
+                } else {
+                    AdFallsApiClient.unlike(session.userId, id)
+                }
+            }
         }
     }
 
     suspend fun toggleFavorite(id: Long) = withContext(Dispatchers.IO) {
-        findAd(id)?.let { dao().updateFavorite(id, !it.favorited) }
+        findAd(id)?.let { ad ->
+            val favorited = !ad.favorited
+            runCatching {
+                val session = ensureUserSession()
+                if (favorited) {
+                    AdFallsApiClient.favorite(session.userId, id)
+                } else {
+                    AdFallsApiClient.unfavorite(session.userId, id)
+                }
+            }
+            dao().updateFavorite(id, favorited)
+        }
     }
 
     suspend fun share(id: Long) = withContext(Dispatchers.IO) {
@@ -144,6 +237,16 @@ object AdRepository {
     suspend fun registerClick(id: Long) = withContext(Dispatchers.IO) {
         seedIfNeeded()
         dao().addClick(id)
+        findAd(id)?.let { ad ->
+            runCatching {
+                AdFallsApiClient.recordBehavior(
+                    userId = ensureUserSession().userId,
+                    adId = id,
+                    channel = ad.channel,
+                    behaviorType = "CLICK"
+                )
+            }
+        }
     }
 
     suspend fun registerImpressions(ids: List<Long>) = withContext(Dispatchers.IO) {
@@ -152,6 +255,16 @@ object AdRepository {
             ids.distinct().forEach { id ->
                 if (exposedIds.add(id)) {
                     dao().addImpression(id)
+                    dao().getAdById(id)?.toModel()?.let { ad ->
+                        runCatching {
+                            AdFallsApiClient.recordBehavior(
+                                userId = ensureUserSession().userId,
+                                adId = id,
+                                channel = ad.channel,
+                                behaviorType = "EXPOSURE"
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -164,12 +277,35 @@ object AdRepository {
                 playing = playing ?: ad.playing,
                 muted = muted ?: ad.muted
             )
+            if (playing == true) {
+                runCatching {
+                    AdFallsApiClient.recordBehavior(
+                        userId = ensureUserSession().userId,
+                        adId = id,
+                        channel = ad.channel,
+                        behaviorType = "VIDEO_PLAY"
+                    )
+                }
+            }
         }
     }
 
     suspend fun setAllVideoMuted(muted: Boolean) = withContext(Dispatchers.IO) {
         seedIfNeeded()
         dao().updateAllVideoMuted(muted)
+    }
+
+    suspend fun clearLocalAdData() = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            userSession = null
+            visibleIds.clear()
+            requestedIds.clear()
+            nextCursors.clear()
+            hasMoreByChannel.clear()
+            exposedIds.clear()
+            dao().deleteAllAds()
+            bumpVisibleRevision()
+        }
     }
 
     private fun dao(): AdDao {
@@ -179,17 +315,7 @@ object AdRepository {
     private suspend fun seedIfNeeded() {
         operationMutex.withLock {
             sampleVideoUrls = MockVideoGenerator.ensureVideos(checkNotNull(appContext))
-            if (
-                dao().countAds() != FIXED_AD_COUNT ||
-                dao().getAdById(1)?.title != FIRST_AD_TITLE ||
-                dao().countAdsByVideoUrl(OLD_SAMPLE_VIDEO_URL) > 0 ||
-                dao().countAdsByVideoUrl(REMOTE_SAMPLE_VIDEO_URL) > 0 ||
-                dao().countVideoAdsNotStartingWith(LOCAL_VIDEO_URL_PREFIX) > 0
-            ) {
-                visibleIds.clear()
-                requestedIds.clear()
-                exposedIds.clear()
-                dao().deleteAllAds()
+            if (dao().countAds() == 0) {
                 dao().insertAds(fixedAds().map { it.toEntity() })
                 bumpVisibleRevision()
             }
@@ -207,17 +333,33 @@ object AdRepository {
     }
 
     private suspend fun requestNextPageLocked(channel: AdChannel, replaceVisible: Boolean): Boolean {
-        val requested = requestedIds.getOrPut(channel) { mutableSetOf() }
-        val response = FakeAdRemoteDataSource.fetchAdPage(
-            dao = dao(),
-            channel = channel,
-            requestedIds = requested,
-            pageSize = PAGE_SIZE
-        )
-        val candidates = response.ads
+        if (!replaceVisible && hasMoreByChannel[channel] == false) return false
+
+        val candidates = runCatching {
+            val session = ensureUserSession()
+            val page = AdFallsApiClient.fetchFeed(
+                channel = channel,
+                cursor = if (replaceVisible) null else nextCursors[channel],
+                size = PAGE_SIZE,
+                userId = session.userId
+            )
+            nextCursors[channel] = page.nextCursor
+            hasMoreByChannel[channel] = page.hasMore
+            upsertPreservingLocalState(page.items.map { it.toModel(channel) })
+        }.getOrElse {
+            val requested = requestedIds.getOrPut(channel) { mutableSetOf() }
+            val response = FakeAdRemoteDataSource.fetchAdPage(
+                dao = dao(),
+                channel = channel,
+                requestedIds = requested,
+                pageSize = PAGE_SIZE
+            )
+            hasMoreByChannel[channel] = response.hasMore
+            response.ads
+        }
         if (candidates.isEmpty()) return false
 
-        requested.addAll(candidates.map { it.id })
+        requestedIds.getOrPut(channel) { mutableSetOf() }.addAll(candidates.map { it.id })
         val visible = visibleIds.getOrPut(channel) { mutableListOf() }
         if (replaceVisible) visible.clear()
         visible.addAll(candidates.map { it.id })
@@ -227,6 +369,8 @@ object AdRepository {
     private suspend fun requestFirstPageLocked(channel: AdChannel): Boolean {
         requestedIds[channel]?.clear()
         visibleIds[channel]?.clear()
+        nextCursors[channel] = ""
+        hasMoreByChannel[channel] = true
         return requestNextPageLocked(channel, replaceVisible = true)
     }
 
@@ -236,6 +380,30 @@ object AdRepository {
 
     private fun bumpVisibleRevision() {
         visibleRevision.value = visibleRevision.value + 1
+    }
+
+    private suspend fun ensureUserSession(): BackendUserSession {
+        userSession?.let { return it }
+        return AdFallsApiClient.login().also { userSession = it }
+    }
+
+    private suspend fun upsertPreservingLocalState(ads: List<AdItem>): List<AdItem> {
+        if (ads.isEmpty()) return emptyList()
+        val merged = ads.map { remote ->
+            val local = dao().getAdById(remote.id)?.toModel()
+            remote.copy(
+                liked = local?.liked ?: remote.liked,
+                favorited = remote.favorited,
+                playing = local?.playing ?: false,
+                muted = local?.muted ?: true,
+                likes = local?.likes ?: remote.likes,
+                shares = local?.shares ?: remote.shares,
+                impressions = local?.impressions ?: remote.impressions,
+                clicks = local?.clicks ?: remote.clicks
+            )
+        }
+        dao().insertAds(merged.map { it.toEntity() })
+        return merged
     }
 
     private fun fixedAds(): List<AdItem> {
@@ -323,5 +491,12 @@ object AdRepository {
         val urls = sampleVideoUrls
         if (urls.isEmpty()) return null
         return urls[((id - 1) % urls.size).toInt()]
+    }
+
+    private fun buildLocalAdAnalysis(ad: AdItem): String {
+        val scenarios = ad.tags.joinToString("、").ifBlank { ad.channel.title }
+        return "${ad.title} 是 ${ad.brand} 带来的一个围绕${scenarios}展开的产品或服务。\n\n" +
+            "它主要想解决的是用户在相关场景里的选择和体验问题：${ad.summary}\n\n" +
+            "从当前信息看，它的亮点在于把${scenarios}相关需求集中到一个更清晰、方便理解的使用场景里。"
     }
 }

@@ -4,11 +4,18 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.media3.ui.PlayerView
@@ -19,6 +26,11 @@ import com.example.adfalls.R
 import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
+import com.example.adfalls.ui.common.RemoteImageLoader
+import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class AdAdapter(
     private val onCardClick: (AdItem) -> Unit,
@@ -30,6 +42,7 @@ class AdAdapter(
     private val onTagClick: (String) -> Unit
 ) : ListAdapter<AdItem, RecyclerView.ViewHolder>(Diff) {
     private var footerText: String? = null
+    private val imageScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     fun submitAds(items: List<AdItem>, footerText: String? = null, commitCallback: (() -> Unit)? = null) {
         submitList(items) {
@@ -88,33 +101,21 @@ class AdAdapter(
     inner class AdViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val mediaContainer: View? = itemView.findViewById(R.id.ad_media_container)
         private val media: View = itemView.findViewById(R.id.ad_media)
+        private val mediaImage: ImageView? = itemView.findViewById(R.id.ad_media_image)
         private val title: TextView = itemView.findViewById(R.id.ad_title)
         private val brand: TextView = itemView.findViewById(R.id.ad_brand)
         private val summary: TextView = itemView.findViewById(R.id.ad_summary)
         private val tags: TextView = itemView.findViewById(R.id.ad_tags)
-        private val stats: TextView = itemView.findViewById(R.id.ad_stats)
+        private val stats: TextView? = itemView.findViewById(R.id.ad_stats)
         private val like: TextView = itemView.findViewById(R.id.action_like)
-        private val favorite: TextView = itemView.findViewById(R.id.action_favorite)
-        private val share: TextView = itemView.findViewById(R.id.action_share)
+        private val favorite: TextView? = itemView.findViewById(R.id.action_favorite)
+        private val share: TextView? = itemView.findViewById(R.id.action_share)
         private val video: ImageButton? = itemView.findViewById(R.id.action_video)
         private val mute: ImageButton? = itemView.findViewById(R.id.action_mute)
         private val progressPanel: View? = itemView.findViewById(R.id.video_progress_panel)
         private val progress: ProgressBar? = itemView.findViewById(R.id.video_progress)
         private val time: TextView? = itemView.findViewById(R.id.video_time)
-        private val _playerView: PlayerView? by lazy {
-            if (itemView.isInEditMode) return@lazy null
-            (media as? ViewGroup)?.let { container ->
-                PlayerView(itemView.context).apply {
-                    useController = false
-                    useArtwork = false
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    container.addView(this, 0)
-                }
-            }
-        }
+        private var playerView: PlayerView? = null
         private var boundAd: AdItem? = null
         private val progressHandler = Handler(Looper.getMainLooper())
         private var progressRunnable: Runnable? = null
@@ -129,11 +130,11 @@ class AdAdapter(
             title.text = ad.title
             brand.text = ad.brand
             summary.text = ad.summary
-            tags.text = ad.tags.joinToString("  ") { "#$it" }
-            stats.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
-            like.text = if (ad.liked) "已赞 ${ad.likes}" else "点赞 ${ad.likes}"
-            favorite.text = if (ad.favorited) "已收藏" else "收藏"
-            share.text = "分享 ${ad.shares}"
+            bindTags(ad.tags)
+            stats?.text = "曝光 ${ad.impressions} · 点击 ${ad.clicks}"
+            like.text = ad.likes.toString()
+            favorite?.text = if (ad.favorited) "已存" else "收藏"
+            share?.text = ad.shares.toString()
             video?.setImageResource(if (ad.playing) R.drawable.ic_video_pause else R.drawable.ic_video_play)
             mute?.setImageResource(if (ad.muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
             video?.contentDescription = if (ad.playing) "暂停" else "播放"
@@ -142,25 +143,41 @@ class AdAdapter(
                 mute?.animate()?.cancel()
                 mute?.alpha = 1f
                 mute?.visibility = View.VISIBLE
+                progressPanel?.visibility = View.VISIBLE
                 startProgressUpdates(ad.id)
                 updateVideoState(ad)
             } else {
                 keepControlsVisibleOnNextBind = false
                 mute?.visibility = View.GONE
+                progressPanel?.visibility = View.GONE
                 hidePlaybackControls(animate = false)
             }
 
             resizeMedia(ad.type)
-            media.background = mediaBackground(ad.mediaColor, ad.type)
-            _playerView?.useController = false
-            _playerView?.let {
-                VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+            media.background = mediaBackground(ad.mediaColor, ad.type, itemView.resources.displayMetrics.density)
+            bindCover(ad)
+            if (ad.type == AdCardType.VIDEO) {
+                ensurePlayerView()?.let {
+                    it.useController = false
+                    VideoPlaybackPool.attach(it, ad.id, ad.videoUrl, ad.playing, ad.muted)
+                    val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+                    it.visibility = if (shouldShowPlayer) {
+                        View.VISIBLE
+                    } else {
+                        View.INVISIBLE
+                    }
+                    mediaImage?.visibility = View.VISIBLE
+                }
+            } else {
+                mediaImage?.visibility = View.VISIBLE
+                playerView?.let(VideoPlaybackPool::detach)
+                playerView?.visibility = View.INVISIBLE
             }
             like.isSelected = ad.liked
-            favorite.isSelected = ad.favorited
+            favorite?.isSelected = ad.favorited
             like.contentDescription = if (ad.liked) "取消点赞" else "点赞"
-            favorite.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
-            share.contentDescription = "分享"
+            favorite?.contentDescription = if (ad.favorited) "取消收藏" else "收藏"
+            share?.contentDescription = "分享"
             tags.contentDescription = "按标签筛选"
 
             itemView.setOnClickListener { onCardClick(boundAd ?: ad) }
@@ -172,13 +189,15 @@ class AdAdapter(
                     onCardClick(currentAd)
                 }
             }
-            _playerView?.setOnClickListener {
+            playerView?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
             }
-            like.setOnClickListener { onLikeClick(boundAd ?: ad) }
-            favorite.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
-            share.setOnClickListener { onShareClick(boundAd ?: ad) }
-            tags.setOnClickListener { (boundAd ?: ad).tags.firstOrNull()?.let(onTagClick) }
+            like.setOnClickListener {
+                animateLikeTap()
+                onLikeClick(boundAd ?: ad)
+            }
+            favorite?.setOnClickListener { onFavoriteClick(boundAd ?: ad) }
+            share?.setOnClickListener { onShareClick(boundAd ?: ad) }
             video?.setOnClickListener {
                 toggleVideoFromUser(boundAd ?: ad)
             }
@@ -189,13 +208,53 @@ class AdAdapter(
             }
         }
 
+        private fun bindTags(values: List<String>) {
+            if (values.isEmpty()) {
+                tags.text = ""
+                tags.movementMethod = null
+                tags.setOnClickListener(null)
+                return
+            }
+
+            val builder = SpannableStringBuilder()
+            values.forEachIndexed { index, value ->
+                if (index > 0) builder.append("  ")
+                val start = builder.length
+                builder.append("#").append(value)
+                val end = builder.length
+                builder.setSpan(
+                    object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            onTagClick(value)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            super.updateDrawState(ds)
+                            ds.isUnderlineText = false
+                            ds.color = tags.currentTextColor
+                        }
+                    },
+                    start,
+                    end,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            tags.text = builder
+            tags.linksClickable = true
+            tags.isClickable = true
+            tags.highlightColor = Color.TRANSPARENT
+            tags.movementMethod = LinkMovementMethod.getInstance()
+        }
+
         fun detachVideo() {
             stopProgressUpdates()
             stopPendingControlHide()
-            _playerView?.let(VideoPlaybackPool::detach)
+            playerView?.let(VideoPlaybackPool::detach)
         }
 
-        fun getPlayerView(): PlayerView? = _playerView
+        fun getPlayerView(): PlayerView? = playerView
+
+        fun ensurePlayerViewForAutoplay(): PlayerView? = ensurePlayerView()
 
         fun getBoundAd(): AdItem? = boundAd
 
@@ -209,10 +268,21 @@ class AdAdapter(
             mute?.alpha = 1f
             mute?.visibility = if (ad.type == AdCardType.VIDEO) View.VISIBLE else View.GONE
             if (ad.type != AdCardType.VIDEO) {
+                mediaImage?.visibility = View.VISIBLE
+                playerView?.visibility = View.INVISIBLE
                 keepControlsVisibleOnNextBind = false
+                progressPanel?.visibility = View.GONE
                 hidePlaybackControls(animate = false)
                 return
             }
+            progressPanel?.visibility = View.VISIBLE
+            val shouldShowPlayer = VideoPlaybackPool.hasActiveFrame(ad.id, ad.videoUrl)
+            playerView?.visibility = if (shouldShowPlayer) {
+                View.VISIBLE
+            } else {
+                View.INVISIBLE
+            }
+            mediaImage?.visibility = View.VISIBLE
             if (ad.playing) {
                 if (keepControlsVisibleOnNextBind) {
                     keepControlsVisibleOnNextBind = false
@@ -232,6 +302,34 @@ class AdAdapter(
             video?.contentDescription = if (ad.playing) "播放" else "暂停"
             showPlaybackControls(scheduleHide = true)
             onVideoClick(ad)
+        }
+
+        private fun ensurePlayerView(): PlayerView? {
+            if (itemView.isInEditMode) return null
+            val existing = playerView
+            if (existing != null) return existing
+            val container = media as? ViewGroup ?: return null
+            val view = LayoutInflater.from(itemView.context).inflate(
+                R.layout.view_ad_player,
+                container,
+                false
+            ) as PlayerView
+            return view.apply {
+                useController = false
+                useArtwork = false
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                container.addView(this, 0)
+                bringToFront()
+                playerView = this
+            }
+        }
+
+        private fun bindCover(ad: AdItem) {
+            val imageView = mediaImage ?: media as? ImageView ?: return
+            RemoteImageLoader.load(imageScope, imageView, ad.coverUrl, ad.mediaColor)
         }
 
         private fun startProgressUpdates(adId: Long) {
@@ -314,15 +412,36 @@ class AdAdapter(
                 }
             }
         }
+
+        private fun animateLikeTap() {
+            like.animate().cancel()
+            like.scaleX = 0.9f
+            like.scaleY = 0.9f
+            like.animate()
+                .scaleX(1.22f)
+                .scaleY(1.22f)
+                .setDuration(LIKE_POP_UP_MS)
+                .setInterpolator(OvershootInterpolator(1.8f))
+                .withEndAction {
+                    like.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(LIKE_SETTLE_MS)
+                        .start()
+                }
+                .start()
+        }
     }
 
-    private fun mediaBackground(color: Int, type: AdCardType): GradientDrawable {
+    private fun mediaBackground(color: Int, type: AdCardType, density: Float): GradientDrawable {
         return GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(color, darken(color))
         ).apply {
-            cornerRadius = 18f
-            if (type == AdCardType.VIDEO) setStroke(3, Color.argb(160, 255, 255, 255))
+            cornerRadius = 10f * density
+            if (type == AdCardType.VIDEO) {
+                setStroke((1.5f * density).roundToInt().coerceAtLeast(1), Color.argb(160, 255, 255, 255))
+            }
         }
     }
 
@@ -358,6 +477,8 @@ class AdAdapter(
         private const val MEDIA_RATIO_9_16 = 9f / 16f
         private const val CONTROLS_AUTO_HIDE_MS = 1_000L
         private const val CONTROLS_FADE_DURATION_MS = 500L
+        private const val LIKE_POP_UP_MS = 130L
+        private const val LIKE_SETTLE_MS = 90L
 
         private fun formatTime(milliseconds: Long): String {
             val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)

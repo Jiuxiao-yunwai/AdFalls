@@ -1,99 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/ai_chat_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050505"
+    android:background="@drawable/bg_app_shell"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
-    android:paddingStart="18dp"
-    android:paddingTop="18dp"
-    android:paddingEnd="18dp">
+    android:paddingStart="32dp"
+    android:paddingTop="20dp"
+    android:paddingEnd="32dp">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="62dp"
+        android:background="@drawable/bg_header_panel"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:padding="6dp">
 
-        <TextView
+        <ImageButton
             android:id="@+id/ai_chat_back"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/bg_dark_button"
-            android:gravity="center"
-            android:text="‹"
-            android:textColor="#FFFFFF"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            android:contentDescription="返回"
+            android:padding="12dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_nav_back" />
 
         <TextView
             android:id="@+id/ai_chat_title"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="14dp"
             android:layout_weight="1"
             android:gravity="center_vertical"
             android:text="AI 广告助手"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/app_text_on_dark_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/ai_chat_scope"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="@string/ai_chat_scope_all"
-        android:textColor="#9A9A9A"
-        android:textSize="12sp"
-        tools:text="全域广告搜索 · AI 自动识别需求维度" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/ai_chat_messages"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="14dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="14dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="18dp"
         tools:itemCount="4"
         tools:listitem="@layout/item_chat_assistant" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginBottom="12dp"
+        android:layout_height="66dp"
+        android:layout_marginBottom="14dp"
+        android:background="@drawable/bg_header_panel"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:padding="6dp">
 
         <EditText
             android:id="@+id/ai_chat_input"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:background="@drawable/bg_search_field"
             android:hint="问问广告助手"
             android:imeOptions="actionSend"
             android:inputType="text"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:singleLine="true"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#8C8C8C"
+            android:textColor="@color/app_text_on_dark_primary"
+            android:textColorHint="@color/app_text_on_dark_muted"
             android:textSize="15sp" />
 
-        <TextView
+        <ImageButton
             android:id="@+id/ai_chat_send"
-            android:layout_width="68dp"
-            android:layout_height="44dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginStart="10dp"
             android:background="@drawable/bg_action_button"
-            android:gravity="center"
-            android:text="发送"
-            android:textColor="#222222"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:contentDescription="发送"
+            android:padding="12dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_send" />
     </LinearLayout>
 </LinearLayout>

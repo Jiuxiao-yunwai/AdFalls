@@ -4,6 +4,6 @@
     android:layout_height="56dp"
     android:gravity="center"
     android:text="到底了"
-    android:textColor="#8C8C8C"
+    android:textColor="@color/app_text_on_dark_muted"
     android:textSize="13sp"
     android:textStyle="bold" />

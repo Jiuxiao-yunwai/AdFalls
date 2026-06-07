@@ -7,6 +7,7 @@ import com.example.adfalls.data.local.toEntity
 import com.example.adfalls.data.local.toModel
 import com.example.adfalls.data.model.AiChatMessage
 import com.example.adfalls.data.model.ChatRole
+import com.example.adfalls.data.model.nextAiChatMessageId
 import com.example.adfalls.data.remote.AiChatAdContextDto
 import com.example.adfalls.data.remote.AiChatRemoteDataSource
 import com.example.adfalls.data.remote.AiChatHistoryDto
@@ -78,8 +79,47 @@ object AiChatRepository {
             }
         )
 
-        val response = AiChatRemoteDataSource.sendMessage(request)
-        return hydrateMessages(response.toChatMessages())
+        if (aiChatDao == null) {
+            return hydrateMessages(AiChatRemoteDataSource.sendMessage(request).toChatMessages())
+        }
+
+        val createdAt = System.currentTimeMillis()
+        if (contextAdId != null) {
+            val reply = AdRepository.analyzeAd(contextAdId, request.query)
+            return listOf(
+                AiChatMessage(
+                    id = nextAiChatMessageId(),
+                    role = ChatRole.ASSISTANT,
+                    text = reply,
+                    createdAt = createdAt
+                )
+            )
+        }
+
+        val (reply, ads) = AdRepository.chatSearch(request.query)
+        val messages = buildList {
+            add(
+                AiChatMessage(
+                    id = nextAiChatMessageId(),
+                    role = ChatRole.ASSISTANT,
+                    text = reply,
+                    createdAt = createdAt
+                )
+            )
+            if (ads.isNotEmpty()) {
+                add(
+                    AiChatMessage(
+                        id = nextAiChatMessageId(),
+                        role = ChatRole.ASSISTANT,
+                        text = "可以优先看看下面这些推荐。",
+                        relatedAdIds = ads.map { it.id },
+                        relatedAds = ads,
+                        createdAt = createdAt + 1
+                    )
+                )
+            }
+        }
+        return hydrateMessages(messages)
     }
 
     private suspend fun hydrateMessages(messages: List<AiChatMessage>): List<AiChatMessage> {

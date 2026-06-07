@@ -2,7 +2,6 @@ package com.example.adfalls.ui.search
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -19,9 +18,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.adfalls.R
 import com.example.adfalls.data.model.AdChannel
+import com.example.adfalls.ui.config.ServerConfigActivity
 import com.example.adfalls.ui.detail.DetailActivity
 import com.example.adfalls.ui.feed.AdAdapter
+import com.example.adfalls.ui.metrics.AdMetricsActivity
 import com.example.adfalls.viewmodel.SearchViewModel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 class SearchActivity : ComponentActivity() {
@@ -29,12 +31,15 @@ class SearchActivity : ComponentActivity() {
     private lateinit var adapter: AdAdapter
     private lateinit var input: EditText
     private lateinit var emptyState: TextView
+    private var metricsLaunchArmed = true
+    private var serverConfigLaunchArmed = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_search)
+        findViewById<View>(R.id.search_root).applySearchResponsiveHorizontalPadding()
 
         val channel = intent.getStringExtra(EXTRA_CHANNEL)
             ?.let { runCatching { AdChannel.valueOf(it) }.getOrNull() }
@@ -45,7 +50,7 @@ class SearchActivity : ComponentActivity() {
 
         input = findViewById(R.id.search_input)
         emptyState = findViewById(R.id.search_empty_state)
-        findViewById<TextView>(R.id.search_back).setOnClickListener { finish() }
+        findViewById<View>(R.id.search_back).setOnClickListener { finish() }
         findViewById<TextView>(R.id.search_scope).text = "当前频道：${channel.title} · 可搜索标题、品牌、摘要和标签"
 
         adapter = AdAdapter(
@@ -73,7 +78,24 @@ class SearchActivity : ComponentActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                viewModel.updateSearchText(s?.toString().orEmpty())
+                val text = s?.toString().orEmpty()
+                if (text.trim().equals(METRICS_ENTRY_QUERY, ignoreCase = true)) {
+                    if (metricsLaunchArmed) {
+                        metricsLaunchArmed = false
+                        startActivity(Intent(this@SearchActivity, AdMetricsActivity::class.java))
+                    }
+                    return
+                }
+                if (text.trim().equals(SERVER_CONFIG_ENTRY_QUERY, ignoreCase = true)) {
+                    if (serverConfigLaunchArmed) {
+                        serverConfigLaunchArmed = false
+                        startActivity(Intent(this@SearchActivity, ServerConfigActivity::class.java))
+                    }
+                    return
+                }
+                metricsLaunchArmed = true
+                serverConfigLaunchArmed = true
+                viewModel.updateSearchText(text)
             }
 
             override fun afterTextChanged(s: Editable?) = Unit
@@ -107,5 +129,15 @@ class SearchActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_CHANNEL = "extra_channel"
+        private const val METRICS_ENTRY_QUERY = "dancebyte"
+        private const val SERVER_CONFIG_ENTRY_QUERY = "worldhello"
+    }
+
+    private fun View.applySearchResponsiveHorizontalPadding() {
+        val density = resources.displayMetrics.density
+        val horizontal = (resources.displayMetrics.widthPixels * 0.10f)
+            .roundToInt()
+            .coerceIn((32f * density).roundToInt(), (56f * density).roundToInt())
+        setPaddingRelative(horizontal, paddingTop, horizontal, paddingBottom)
     }
 }

@@ -3,8 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
     android:layout_marginBottom="14dp"
     android:background="@drawable/bg_ad_card"
+    android:clickable="true"
+    android:focusable="true"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -17,8 +21,16 @@
             android:id="@+id/ad_media"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#222222"
-            tools:background="#222222" />
+            android:background="@color/app_surface_dark"
+            tools:background="@color/app_surface_dark">
+
+            <ImageView
+                android:id="@+id/ad_media_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+        </FrameLayout>
 
         <ImageButton
             android:id="@+id/action_video"
@@ -35,14 +47,14 @@
 
         <ImageButton
             android:id="@+id/action_mute"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:layout_gravity="top|end"
             android:layout_marginTop="10dp"
             android:layout_marginEnd="10dp"
-            android:background="@drawable/bg_video_control_circle"
+            android:background="@drawable/bg_video_mute_circle"
             android:contentDescription="静音"
-            android:padding="6dp"
+            android:padding="13dp"
             android:scaleType="center"
             android:src="@drawable/ic_volume_off"
             android:visibility="gone"
@@ -77,7 +89,7 @@
                 android:layout_marginStart="8dp"
                 android:gravity="end"
                 android:text="0:00 / 0:00"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/app_text_on_dark_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -87,8 +99,13 @@
         android:id="@+id/ad_brand"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:textColor="#6D6D6D"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_brand_chip"
+        android:paddingStart="10dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
+        android:textColor="@color/app_text_tertiary"
         android:textSize="12sp"
         android:textStyle="bold"
         tools:text="VoltBike" />
@@ -98,7 +115,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textColor="#151515"
+        android:textColor="@color/app_text_primary"
         android:textSize="20sp"
         android:textStyle="bold"
         tools:text="城市短途骑行体验" />
@@ -107,52 +124,37 @@
         android:id="@+id/ad_summary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:lineSpacingExtra="2dp"
-        android:textColor="#454545"
+        android:layout_marginTop="6dp"
+        android:lineSpacingExtra="3dp"
+        android:textColor="@color/app_text_secondary"
         android:textSize="14sp"
         tools:text="短视频广告展示城市骑行路线和低碳通勤方案。" />
 
-    <TextView
-        android:id="@+id/ad_tags"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="#1F7A68"
-        android:textSize="13sp"
-        tools:text="#骑行  #低碳  #通勤" />
-
-    <TextView
-        android:id="@+id/ad_stats"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:textColor="#777777"
-        android:textSize="12sp"
-        tools:text="曝光 39 · 点击 7" />
-
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:layout_marginTop="10dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/ad_tags"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="36dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/app_accent_strong"
+            android:textSize="13sp"
+            tools:text="#骑行  #低碳  #通勤" />
+
+        <TextView
             android:id="@+id/action_like"
-            style="@style/AdActionButton"
-            tools:text="点赞 8" />
-
-        <TextView
-            android:id="@+id/action_favorite"
-            style="@style/AdActionButton"
-            android:layout_marginStart="6dp"
-            tools:text="收藏" />
-
-        <TextView
-            android:id="@+id/action_share"
-            style="@style/AdActionButton"
-            android:layout_marginStart="6dp"
-            tools:text="分享" />
+            style="@style/AdInlineLikeButton"
+            android:layout_marginStart="8dp"
+            android:drawableStart="@drawable/ic_inline_like"
+            tools:text="8" />
     </LinearLayout>
+
 </LinearLayout>

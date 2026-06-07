@@ -24,6 +24,7 @@ class AiChatViewModel : ViewModel() {
     private val mutableUiState = MutableStateFlow(AiChatUiState())
     val uiState: StateFlow<AiChatUiState> = mutableUiState.asStateFlow()
     private var pendingInitialQuery: String? = null
+    private var pendingInitialAiPrompt: String? = null
     private var pendingInitialContextAdId: Long? = null
     private var initialQuerySubmitted = false
 
@@ -48,12 +49,13 @@ class AiChatViewModel : ViewModel() {
         mutableUiState.update { it.copy(inputText = text) }
     }
 
-    fun submitInitialQueryOnce(query: String, contextAdId: Long? = null) {
+    fun submitInitialQueryOnce(query: String, aiPrompt: String? = null, contextAdId: Long? = null) {
         val initialQuery = query.trim()
         if (initialQuery.isEmpty() || initialQuerySubmitted) return
 
         initialQuerySubmitted = true
         pendingInitialQuery = initialQuery
+        pendingInitialAiPrompt = aiPrompt?.trim()?.takeIf { it.isNotEmpty() }
         pendingInitialContextAdId = contextAdId
         submitPendingInitialQuery()
     }
@@ -62,10 +64,11 @@ class AiChatViewModel : ViewModel() {
         viewModelScope.launch { AdRepository.registerClick(adId) }
     }
 
-    fun sendMessage(contextAdId: Long? = null) {
+    fun sendMessage(contextAdId: Long? = null, aiPrompt: String? = null) {
         val state = mutableUiState.value
         val query = state.inputText.trim()
         if (query.isEmpty() || state.sending || !state.historyLoaded) return
+        val requestQuery = aiPrompt?.trim()?.takeIf { it.isNotEmpty() } ?: query
 
         val baseId = System.currentTimeMillis()
         val userMessage = AiChatMessage(
@@ -93,7 +96,7 @@ class AiChatViewModel : ViewModel() {
         viewModelScope.launch {
             runCatching {
                 AiChatRepository.saveMessages(listOf(userMessage))
-                AiChatRepository.sendMessage(query, history, contextAdId)
+                AiChatRepository.sendMessage(requestQuery, history, contextAdId)
             }.onSuccess { replies ->
                 AiChatRepository.saveMessages(replies)
                 mutableUiState.update {
@@ -126,9 +129,11 @@ class AiChatViewModel : ViewModel() {
         if (!state.historyLoaded || state.sending) return
 
         val contextAdId = pendingInitialContextAdId
+        val aiPrompt = pendingInitialAiPrompt
         pendingInitialQuery = null
+        pendingInitialAiPrompt = null
         pendingInitialContextAdId = null
         mutableUiState.update { it.copy(inputText = query) }
-        sendMessage(contextAdId)
+        sendMessage(contextAdId, aiPrompt)
     }
 }

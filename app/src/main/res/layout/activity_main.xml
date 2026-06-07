@@ -1,170 +1,192 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#050505"
+    android:background="@drawable/bg_app_shell"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
-    android:paddingStart="18dp"
-    android:paddingTop="18dp"
-    android:paddingEnd="18dp">
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp">
 
     <LinearLayout
+        android:id="@+id/app_frame"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_app_frame"
+        android:orientation="vertical"
+        android:paddingStart="10dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="10dp">
 
-        <TextView
-            android:id="@+id/ai_chat_button"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_dark_button"
-            android:contentDescription="AI 搜索"
-            android:gravity="center"
-            android:text="AI"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <FrameLayout
-            android:id="@+id/channel_tabs"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1">
+        <LinearLayout
+            android:id="@+id/top_region"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal">
+                android:layout_height="62dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_header_panel"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="6dp">
 
-                <TextView
-                    android:id="@+id/tab_featured"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="精选"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                <ImageButton
+                    android:id="@+id/ai_chat_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_ai_button"
+                    android:contentDescription="AI 搜索"
+                    android:focusable="true"
+                    android:padding="10dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_ai_spark" />
 
-                <TextView
-                    android:id="@+id/tab_commerce"
+                <FrameLayout
+                    android:id="@+id/channel_tabs"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="电商"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:background="@drawable/bg_tab_container"
+                    android:padding="3dp">
 
-                <TextView
-                    android:id="@+id/tab_local"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="本地"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tab_featured"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:minHeight="48dp"
+                            android:text="精选"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tab_commerce"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:minHeight="48dp"
+                            android:text="电商"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tab_local"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:minHeight="48dp"
+                            android:text="本地"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/tab_indicator"
+                        android:layout_width="0dp"
+                        android:layout_height="3dp"
+                        android:layout_gravity="bottom|start"
+                        android:layout_marginBottom="3dp"
+                        android:background="@drawable/bg_tab_underline" />
+                </FrameLayout>
+
+                <ImageButton
+                    android:id="@+id/search_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_search_icon_button"
+                    android:contentDescription="搜索"
+                    android:focusable="true"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_search"
+                    android:tint="@color/app_text_on_dark_primary" />
             </LinearLayout>
 
-            <View
-                android:id="@+id/tab_indicator"
-                android:layout_width="0dp"
-                android:layout_height="3dp"
-                android:layout_gravity="bottom|start"
-                android:background="@drawable/bg_tab_underline" />
-        </FrameLayout>
+            <LinearLayout
+                android:id="@+id/tag_filter_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:visibility="gone">
 
-        <ImageButton
-            android:id="@+id/search_button"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_dark_button"
-            android:contentDescription="搜索"
-            android:padding="10dp"
-            android:src="@drawable/ic_search"
-            android:tint="#FFFFFF" />
-    </LinearLayout>
+                <TextView
+                    android:id="@+id/tag_filter_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="22dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:textColor="@color/app_text_on_dark_muted"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/tag_filter_bar"
-        android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:layout_marginTop="10dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tag_filter_text"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_action_button"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:textColor="#222222"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tag_filter_clear"
-            android:layout_width="64dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_dark_button"
-            android:gravity="center"
-            android:text="清除"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipe_refresh"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="14dp"
-        android:layout_weight="1">
-
-        <FrameLayout
+        <com.example.adfalls.ui.feed.GestureSafeSwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="0dp"
+            android:layout_marginTop="14dp"
+            android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/ad_list"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingBottom="22dp"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_ad_large" />
+                android:layout_height="match_parent">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/ad_list_outgoing"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingBottom="22dp"
-                android:visibility="gone"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_ad_large" />
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/ad_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="28dp"
+                    tools:itemCount="3"
+                    tools:listitem="@layout/item_ad_large" />
 
-            <TextView
-                android:id="@+id/feed_empty_state"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="没有找到匹配的广告"
-                android:textColor="#8C8C8C"
-                android:textSize="14sp"
-                android:visibility="gone" />
-        </FrameLayout>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/ad_list_outgoing"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:paddingBottom="28dp"
+                    android:visibility="gone"
+                    tools:itemCount="3"
+                    tools:listitem="@layout/item_ad_large" />
+
+                <TextView
+                    android:id="@+id/feed_empty_state"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="没有找到匹配的广告"
+                    android:textColor="@color/app_text_on_dark_muted"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </com.example.adfalls.ui.feed.GestureSafeSwipeRefreshLayout>
+    </LinearLayout>
 </LinearLayout>

@@ -23,7 +23,14 @@ data class FeedUiState(
     val selectedTag: String? = null,
     val ads: List<AdItem> = emptyList(),
     val loadingMore: Boolean = false,
-    val endReached: Boolean = false
+    val endReached: Boolean = false,
+    val refreshVersion: Int = 0
+)
+
+private data class FeedStatus(
+    val loadingMore: Boolean,
+    val endReached: Boolean,
+    val refreshVersion: Int
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -33,27 +40,32 @@ class FeedViewModel : ViewModel() {
     private val selectedTag = MutableStateFlow<String?>(null)
     private val loadingMore = MutableStateFlow(false)
     private val endReached = MutableStateFlow(false)
+    private val refreshVersion = MutableStateFlow(0)
     private val manuallyPausedVideoIds = mutableSetOf<Long>()
 
     private val channelAds = activeChannel.flatMapLatest { channel ->
         AdRepository.observeAdsByChannel(channel).map { ads -> channel to ads }
     }
 
+    private val feedStatus = combine(loadingMore, endReached, refreshVersion) { loading, reached, version ->
+        FeedStatus(loadingMore = loading, endReached = reached, refreshVersion = version)
+    }
+
     val uiState: StateFlow<FeedUiState> = combine(
         searchText,
         selectedTag,
         channelAds,
-        loadingMore,
-        endReached
-    ) { query, tag, channelAndAds, loading, reached ->
+        feedStatus
+    ) { query, tag, channelAndAds, status ->
         val (channel, ads) = channelAndAds
         FeedUiState(
             activeChannel = channel,
             searchText = query,
             selectedTag = tag,
             ads = filterAds(ads, query, tag),
-            loadingMore = loading,
-            endReached = query.isBlank() && tag == null && reached
+            loadingMore = status.loadingMore,
+            endReached = query.isBlank() && tag == null && status.endReached,
+            refreshVersion = status.refreshVersion
         )
     }.stateIn(
         scope = viewModelScope,
@@ -83,19 +95,20 @@ class FeedViewModel : ViewModel() {
         endReached.value = false
     }
 
-    fun refresh() {
+    fun refresh(channel: AdChannel = activeChannel.value) {
         viewModelScope.launch {
-            AdRepository.refresh(activeChannel.value)
+            AdRepository.refresh(channel)
             endReached.value = false
+            refreshVersion.value += 1
         }
     }
 
     fun loadMore() {
         val state = uiState.value
         if (state.loadingMore || state.searchText.isNotBlank() || state.selectedTag != null) return
+        loadingMore.value = true
 
         viewModelScope.launch {
-            loadingMore.value = true
             try {
                 endReached.value = !AdRepository.loadMore(activeChannel.value)
             } finally {
@@ -135,6 +148,17 @@ class FeedViewModel : ViewModel() {
         viewModelScope.launch { VideoPlaybackPool.pauseFromFeed(adId) }
     }
 
+    fun pauseCurrentVideosKeepingFrame() {
+        viewModelScope.launch { pauseCurrentVideosKeepingFrameAndWait() }
+    }
+
+    suspend fun pauseCurrentVideosKeepingFrameAndWait() {
+        VideoPlaybackPool.pauseActiveAndRelease()
+        uiState.value.ads
+            .filter { it.playing || VideoPlaybackPool.hasActiveFrame(it.id, it.videoUrl) }
+            .forEach { ad -> VideoPlaybackPool.pauseFromFeed(ad.id) }
+    }
+
     private fun pauseCurrentVideos() {
         uiState.value.ads
             .filter { it.playing }
@@ -156,7 +180,7 @@ class FeedViewModel : ViewModel() {
     }
 
     fun toggleVideoPlay(ad: AdItem) {
-        if (ad.playing) {
+        if (VideoPlaybackPool.willPauseOnToggle(ad.id, ad.playing)) {
             manuallyPausedVideoIds.add(ad.id)
         } else {
             manuallyPausedVideoIds.remove(ad.id)

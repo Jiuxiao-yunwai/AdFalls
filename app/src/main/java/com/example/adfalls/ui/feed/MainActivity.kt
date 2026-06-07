@@ -4,7 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Parcelable
-import android.view.GestureDetector
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
@@ -13,11 +13,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.adfalls.R
+import com.example.adfalls.cache.AdMediaPrefetcher
+import com.example.adfalls.cache.VideoPlaybackPool
 import com.example.adfalls.data.model.AdChannel
 import com.example.adfalls.data.model.AdCardType
 import com.example.adfalls.data.model.AdItem
@@ -27,6 +28,7 @@ import com.example.adfalls.ui.search.SearchActivity
 import com.example.adfalls.viewmodel.FeedUiState
 import com.example.adfalls.viewmodel.FeedViewModel
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -43,7 +45,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var adapter: AdAdapter
     private lateinit var outgoingAdapter: AdAdapter
     private lateinit var viewModel: FeedViewModel
-    private lateinit var swipeDetector: GestureDetector
     private val listStates = mutableMapOf<AdChannel, Parcelable?>()
     private var pendingListCommitChannel: AdChannel? = null
     private var pendingListCommit: (() -> Unit)? = null
@@ -51,12 +52,24 @@ class MainActivity : ComponentActivity() {
     private var pendingSwitchDirection = 0
     private var outgoingSnapshotReady = false
     private var scheduledFeedVideoId: Long? = null
+    private var pendingRefreshScrollChannel: AdChannel? = null
+    private var handledRefreshVersion = 0
+    private var pageSwitchInProgress = false
+    private var refreshFadePending = false
+    private var nextPageSwitchAllowedAt = 0L
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var horizontalSwipeActive = false
+    private var verticalSwipeActive = false
+    private var transitionPauseHandled = false
+    private var transitionLaunchInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = getColor(R.color.app_bg)
+        window.navigationBarColor = getColor(R.color.app_bg)
         setContentView(R.layout.activity_main)
+        findViewById<View>(R.id.main_root).applyMainResponsiveHorizontalPadding()
         viewModel = ViewModelProvider.create(this)[FeedViewModel::class]
 
         tabs = listOf(
@@ -73,7 +86,8 @@ class MainActivity : ComponentActivity() {
         tagFilterBar = findViewById(R.id.tag_filter_bar)
         tagFilterText = findViewById(R.id.tag_filter_text)
         emptyState = findViewById(R.id.feed_empty_state)
-        findViewById<View>(R.id.tag_filter_clear).setOnClickListener { viewModel.clearTag() }
+        tagFilterBar.setOnClickListener { viewModel.clearTag() }
+        tagFilterText.setOnClickListener { viewModel.clearTag() }
 
         adapter = createAdapter()
         outgoingAdapter = createAdapter()
@@ -83,42 +97,21 @@ class MainActivity : ComponentActivity() {
         outgoingRecyclerView = findViewById(R.id.ad_list_outgoing)
         outgoingRecyclerView.layoutManager = outgoingLayoutManager
         outgoingRecyclerView.adapter = outgoingAdapter
-        (outgoingRecyclerView.itemAnimator as? DefaultItemAnimator)?.supportsChangeAnimations = false
+        configureRecyclerViewForFeed(outgoingRecyclerView)
         outgoingRecyclerView.isEnabled = false
 
         recyclerView = findViewById(R.id.ad_list)
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
-        (recyclerView.itemAnimator as? DefaultItemAnimator)?.supportsChangeAnimations = false
-        swipeDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent): Boolean = true
-
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                val start = e1 ?: return false
-                val dx = e2.x - start.x
-                val dy = e2.y - start.y
-                if (abs(dx) < SWIPE_DISTANCE || abs(dx) < abs(dy) * 1.25f || abs(velocityX) < SWIPE_VELOCITY) {
-                    return false
-                }
-                val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
-                val nextIndex = if (dx < 0) currentIndex + 1 else currentIndex - 1
-                if (nextIndex !in AdChannel.entries.indices) return false
-                selectTab(AdChannel.entries[nextIndex])
-                return true
-            }
-        })
-        recyclerView.setOnTouchListener { _, event ->
-            swipeDetector.onTouchEvent(event)
+        configureRecyclerViewForFeed(recyclerView)
+        recyclerView.setOnTouchListener { view, event ->
+            handleFeedSwipeTouch(view, event)
             false
         }
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 registerVisibleImpressions()
+                prefetchUpcomingMedia()
                 scheduleFeedVideoAutoplay()
                 val state = viewModel.uiState.value
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
@@ -127,20 +120,40 @@ class MainActivity : ComponentActivity() {
                     state.searchText.isBlank() &&
                     state.selectedTag == null &&
                     dy > 0 &&
-                    lastVisible >= adapter.itemCount - 2
+                    shouldPreloadMore(state, lastVisible)
                 ) {
                     viewModel.loadMore()
                 }
             }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    registerVisibleImpressions()
+                    prefetchUpcomingMedia()
+                    scheduleFeedVideoAutoplay()
+                }
+            }
+        })
+        recyclerView.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                recyclerView.post { scheduleFeedVideoAutoplay() }
+            }
+
+            override fun onChildViewDetachedFromWindow(view: View) = Unit
         })
 
         swipeRefresh = findViewById(R.id.swipe_refresh)
-        swipeRefresh.setColorSchemeColors(Color.WHITE, Color.rgb(78, 164, 255))
-        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.rgb(28, 28, 28))
+        swipeRefresh.setColorSchemeColors(getColor(R.color.app_text_on_dark_primary), getColor(R.color.app_refresh_blue))
+        swipeRefresh.setProgressBackgroundColorSchemeColor(getColor(R.color.app_surface_dark_pressed))
         swipeRefresh.setOnRefreshListener {
-            viewModel.refresh()
+            val channel = viewModel.uiState.value.activeChannel
+            pendingRefreshScrollChannel = channel
+            listStates.remove(channel)
+            recyclerView.stopScroll()
+            scheduledFeedVideoId = null
+            startRefreshFadeOut()
+            viewModel.refresh(channel)
             swipeRefresh.isRefreshing = false
-            recyclerView.scrollToPosition(0)
         }
 
         lifecycleScope.launch {
@@ -157,21 +170,24 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        transitionPauseHandled = false
+        transitionLaunchInProgress = false
         if (::recyclerView.isInitialized) {
             recyclerView.post { scheduleFeedVideoAutoplay() }
         }
     }
 
     override fun onPause() {
-        pauseScheduledFeedVideo()
+        if (!transitionPauseHandled) {
+            pauseFeedVideosKeepingFrame()
+        }
         super.onPause()
     }
 
     private fun createAdapter(): AdAdapter {
         return AdAdapter(
             onCardClick = { ad ->
-                viewModel.registerClick(ad.id)
-                startActivity(Intent(this, DetailActivity::class.java).putExtra(DetailActivity.EXTRA_AD_ID, ad.id))
+                openDetailPage(ad)
             },
             onLikeClick = { ad -> viewModel.toggleLike(ad.id) },
             onFavoriteClick = { ad -> viewModel.toggleFavorite(ad.id) },
@@ -185,10 +201,14 @@ class MainActivity : ComponentActivity() {
     private fun selectTab(channel: AdChannel, restorePosition: Boolean = true) {
         val currentChannel = viewModel.uiState.value.activeChannel
         if (restorePosition && channel == currentChannel) return
+        if (pageSwitchInProgress) return
+        val now = SystemClock.elapsedRealtime()
+        if (restorePosition && now < nextPageSwitchAllowedAt) return
         if (::layoutManager.isInitialized) {
             listStates[currentChannel] = layoutManager.onSaveInstanceState()
         }
         pendingSwitchDirection = AdChannel.entries.indexOf(channel) - AdChannel.entries.indexOf(currentChannel)
+        pageSwitchInProgress = pendingSwitchDirection != 0
         prepareOutgoingList(pendingSwitchDirection) {
             recyclerView.translationX = offscreenOffset(pendingSwitchDirection)
             scheduledFeedVideoId = null
@@ -209,7 +229,13 @@ class MainActivity : ComponentActivity() {
     private fun updateTabs(activeChannel: AdChannel) {
         val activeIndex = AdChannel.entries.indexOf(activeChannel)
         tabs.forEachIndexed { index, tab ->
-            tab.setTextColor(if (index == activeIndex) Color.WHITE else Color.rgb(145, 145, 145))
+            tab.setTextColor(
+                if (index == activeIndex) {
+                    getColor(R.color.app_text_on_dark_primary)
+                } else {
+                    getColor(R.color.app_text_on_dark_muted)
+                }
+            )
             tab.setBackgroundColor(Color.TRANSPARENT)
         }
         moveTabIndicator(activeIndex)
@@ -225,9 +251,152 @@ class MainActivity : ComponentActivity() {
                 pendingListCommit = null
                 pendingListCommitChannel = null
             }
+            scrollToTopAfterRefreshIfNeeded(state)
             registerVisibleImpressions()
-            recyclerView.post { scheduleFeedVideoAutoplay() }
+            prefetchUpcomingMedia()
+            recyclerView.post {
+                scheduleFeedVideoAutoplay()
+                recyclerView.post { scheduleFeedVideoAutoplay() }
+            }
         }
+        scheduleRefreshScrollFallback(state)
+    }
+
+    private fun configureRecyclerViewForFeed(target: RecyclerView) {
+        target.setHasFixedSize(true)
+        target.setItemViewCacheSize(FEED_ITEM_CACHE_SIZE)
+        target.itemAnimator = null
+    }
+
+    private fun handleFeedSwipeTouch(view: View, event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDownX = event.x
+                touchDownY = event.y
+                horizontalSwipeActive = false
+                verticalSwipeActive = false
+                swipeRefresh.isEnabled = true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (verticalSwipeActive) return
+                if (!horizontalSwipeActive && isVerticalScrollIntent(event)) {
+                    verticalSwipeActive = true
+                    swipeRefresh.isEnabled = true
+                    view.parent.requestDisallowInterceptTouchEvent(false)
+                    return
+                }
+                if (horizontalSwipeActive || isHorizontalSwipeIntent(event)) {
+                    horizontalSwipeActive = true
+                    swipeRefresh.isEnabled = false
+                    view.parent.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (horizontalSwipeActive) {
+                    switchChannelForSwipe(event.x - touchDownX)
+                }
+                horizontalSwipeActive = false
+                verticalSwipeActive = false
+                swipeRefresh.isEnabled = true
+                view.parent.requestDisallowInterceptTouchEvent(false)
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                horizontalSwipeActive = false
+                verticalSwipeActive = false
+                swipeRefresh.isEnabled = true
+                view.parent.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+    }
+
+    private fun isHorizontalSwipeIntent(event: MotionEvent): Boolean {
+        val dx = event.x - touchDownX
+        val dy = event.y - touchDownY
+        return abs(dx) >= SWIPE_DISTANCE * SWIPE_INTENT_DISTANCE_RATIO &&
+            abs(dx) > abs(dy) * SWIPE_DIRECTION_RATIO
+    }
+
+    private fun isVerticalScrollIntent(event: MotionEvent): Boolean {
+        val dx = event.x - touchDownX
+        val dy = event.y - touchDownY
+        return abs(dy) >= VERTICAL_LOCK_DISTANCE &&
+            abs(dy) > abs(dx) * VERTICAL_LOCK_DIRECTION_RATIO
+    }
+
+    private fun switchChannelForSwipe(dx: Float) {
+        if (abs(dx) < SWIPE_DISTANCE) return
+        val currentIndex = AdChannel.entries.indexOf(viewModel.uiState.value.activeChannel)
+        val nextIndex = if (dx < 0) currentIndex + 1 else currentIndex - 1
+        if (nextIndex !in AdChannel.entries.indices) return
+        selectTab(AdChannel.entries[nextIndex])
+    }
+
+    private fun scrollToTopAfterRefreshIfNeeded(state: FeedUiState) {
+        if (state.refreshVersion <= handledRefreshVersion) return
+        val refreshChannel = pendingRefreshScrollChannel
+        pendingRefreshScrollChannel = null
+        handledRefreshVersion = state.refreshVersion
+        if (refreshChannel != state.activeChannel) {
+            resetRefreshFade()
+            return
+        }
+
+        listStates.remove(state.activeChannel)
+        scheduledFeedVideoId = null
+        forceScrollToTopAfterRefresh()
+    }
+
+    private fun scheduleRefreshScrollFallback(state: FeedUiState) {
+        if (state.refreshVersion <= handledRefreshVersion) return
+        if (pendingRefreshScrollChannel != state.activeChannel) return
+        recyclerView.post { scrollToTopAfterRefreshIfNeeded(state) }
+    }
+
+    private fun forceScrollToTopAfterRefresh() {
+        recyclerView.stopScroll()
+        recyclerView.clearFocus()
+        layoutManager.scrollToPositionWithOffset(0, 0)
+        recyclerView.post {
+            recyclerView.stopScroll()
+            layoutManager.scrollToPositionWithOffset(0, 0)
+            recyclerView.postOnAnimation {
+                recyclerView.stopScroll()
+                layoutManager.scrollToPositionWithOffset(0, 0)
+                playRefreshFadeIn()
+                registerVisibleImpressions()
+                prefetchUpcomingMedia()
+                scheduleFeedVideoAutoplay()
+            }
+        }
+    }
+
+    private fun startRefreshFadeOut() {
+        refreshFadePending = true
+        recyclerView.animate().cancel()
+        recyclerView.animate()
+            .alpha(REFRESH_FADE_OUT_ALPHA)
+            .setDuration(REFRESH_FADE_OUT_DURATION)
+            .start()
+    }
+
+    private fun playRefreshFadeIn() {
+        if (!refreshFadePending) return
+        refreshFadePending = false
+        recyclerView.animate().cancel()
+        recyclerView.alpha = 0f
+        recyclerView.animate()
+            .alpha(1f)
+            .setDuration(REFRESH_FADE_IN_DURATION)
+            .start()
+    }
+
+    private fun resetRefreshFade() {
+        refreshFadePending = false
+        recyclerView.animate().cancel()
+        recyclerView.alpha = 1f
     }
 
     private fun footerTextFor(state: FeedUiState): String? {
@@ -238,11 +407,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun shouldPreloadMore(state: FeedUiState, lastVisiblePosition: Int): Boolean {
+        if (state.ads.isEmpty()) return false
+        val lastAdPosition = state.ads.lastIndex
+        val remaining = lastAdPosition - lastVisiblePosition
+        return remaining <= AD_INFO_PRELOAD_THRESHOLD
+    }
+
     private fun updateFilterAndEmptyState(state: FeedUiState) {
         val tag = state.selectedTag
         tagFilterBar.visibility = if (tag == null) View.GONE else View.VISIBLE
         if (tag != null) {
-            tagFilterText.text = "正在查看 #$tag"
+            tagFilterText.text = "已按标签筛选：#$tag · 点击清除"
         }
         val filtering = state.searchText.isNotBlank() || tag != null
         emptyState.visibility = if (filtering && state.ads.isEmpty()) View.VISIBLE else View.GONE
@@ -268,11 +444,22 @@ class MainActivity : ComponentActivity() {
         viewModel.pauseVideosOutside(visibleAdIds)
     }
 
+    private fun prefetchUpcomingMedia() {
+        if (adapter.currentList.isEmpty()) return
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
+        val start = firstVisible.takeIf { it >= 0 } ?: 0
+        if (start > adapter.currentList.lastIndex) return
+        val visibleEnd = lastVisible.takeIf { it >= start } ?: start
+        val end = (visibleEnd + MEDIA_PREFETCH_AHEAD_COUNT).coerceAtMost(adapter.currentList.lastIndex)
+        AdMediaPrefetcher.prefetch(lifecycleScope, this, adapter.currentList.subList(start, end + 1))
+    }
+
     private fun scheduleFeedVideoAutoplay() {
         val candidate = findFirstFullyVisibleVideo()
         if (candidate != null) {
             val (ad, holder) = candidate
-            val playerView = holder.getPlayerView() ?: return
+            val playerView = holder.ensurePlayerViewForAutoplay() ?: return
             if (scheduledFeedVideoId != ad.id || !ad.playing) {
                 viewModel.autoPlayVisibleVideo(ad, playerView)
             }
@@ -290,6 +477,35 @@ class MainActivity : ComponentActivity() {
     private fun pauseScheduledFeedVideo() {
         scheduledFeedVideoId?.let(viewModel::pauseVideoIfGone)
         scheduledFeedVideoId = null
+    }
+
+    private fun pauseFeedVideosKeepingFrame() {
+        viewModel.pauseCurrentVideosKeepingFrame()
+        scheduledFeedVideoId = null
+    }
+
+    private fun pauseForOutgoingTransitionThen(block: () -> Unit) {
+        if (transitionLaunchInProgress) return
+        transitionLaunchInProgress = true
+        transitionPauseHandled = true
+        scheduledFeedVideoId = null
+        lifecycleScope.launch {
+            viewModel.pauseCurrentVideosKeepingFrameAndWait()
+            block()
+        }
+    }
+
+    private fun openDetailPage(ad: AdItem) {
+        val shouldAutoPlayInDetail = ad.type == AdCardType.VIDEO &&
+            (VideoPlaybackPool.isPlaybackActive(ad.id, ad.videoUrl) || ad.playing)
+        viewModel.registerClick(ad.id)
+        pauseForOutgoingTransitionThen {
+            startActivity(
+                Intent(this, DetailActivity::class.java)
+                    .putExtra(DetailActivity.EXTRA_AD_ID, ad.id)
+                    .putExtra(DetailActivity.EXTRA_AUTO_PLAY_VIDEO, shouldAutoPlayInDetail)
+            )
+        }
     }
 
     private fun findFirstFullyVisibleVideo(): Pair<AdItem, AdAdapter.AdViewHolder>? {
@@ -363,8 +579,9 @@ class MainActivity : ComponentActivity() {
         outgoingRecyclerView.alpha = 1f
         outgoingRecyclerView.visibility = View.INVISIBLE
         outgoingSnapshotReady = false
-        outgoingAdapter.submitAds(viewModel.uiState.value.ads, footerTextFor(viewModel.uiState.value)) {
-            outgoingLayoutManager.onRestoreInstanceState(layoutManager.onSaveInstanceState())
+        val snapshot = visibleSnapshotItems()
+        outgoingAdapter.submitAds(snapshot.items, footerText = null) {
+            outgoingLayoutManager.scrollToPositionWithOffset(0, snapshot.firstItemOffset)
             outgoingSnapshotReady = true
             outgoingRecyclerView.visibility = View.VISIBLE
             onReady()
@@ -372,11 +589,32 @@ class MainActivity : ComponentActivity() {
         recyclerView.alpha = 1f
     }
 
+    private fun visibleSnapshotItems(): VisibleSnapshot {
+        val ads = viewModel.uiState.value.ads
+        if (ads.isEmpty()) return VisibleSnapshot(emptyList(), recyclerView.paddingTop)
+        val first = layoutManager.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val last = layoutManager.findLastVisibleItemPosition().coerceAtLeast(first)
+        val start = first.coerceAtMost(ads.lastIndex)
+        val end = (last + SNAPSHOT_EXTRA_ITEMS).coerceAtMost(ads.lastIndex)
+        val offset = layoutManager.findViewByPosition(first)?.top ?: recyclerView.paddingTop
+        return VisibleSnapshot(ads.subList(start, end + 1), offset)
+    }
+
     private fun animatePageSwitch(direction: Int) {
-        if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) return
+        if (direction == 0 || !::recyclerView.isInitialized || recyclerView.width == 0) {
+            pageSwitchInProgress = false
+            startPageSwitchCooldown()
+            return
+        }
         recyclerView.animate().cancel()
         outgoingRecyclerView.animate().cancel()
-        if (!outgoingSnapshotReady) return
+        if (!outgoingSnapshotReady) {
+            pageSwitchInProgress = false
+            startPageSwitchCooldown()
+            return
+        }
+        recyclerView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        outgoingRecyclerView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         recyclerView.translationX = offscreenOffset(direction)
         recyclerView.alpha = 1f
         outgoingRecyclerView.translationX = 0f
@@ -393,10 +631,18 @@ class MainActivity : ComponentActivity() {
             .withEndAction {
                 outgoingRecyclerView.visibility = View.GONE
                 outgoingRecyclerView.translationX = 0f
+                outgoingRecyclerView.setLayerType(View.LAYER_TYPE_NONE, null)
+                recyclerView.setLayerType(View.LAYER_TYPE_NONE, null)
                 outgoingSnapshotReady = false
+                pageSwitchInProgress = false
+                startPageSwitchCooldown()
                 outgoingAdapter.submitAds(emptyList(), footerText = null)
             }
             .start()
+    }
+
+    private fun startPageSwitchCooldown() {
+        nextPageSwitchAllowedAt = SystemClock.elapsedRealtime() + PAGE_SWITCH_COOLDOWN_MS
     }
 
     private fun offscreenOffset(direction: Int): Float {
@@ -408,20 +654,48 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openSearchPage() {
-        startActivity(
-            Intent(this, SearchActivity::class.java)
-                .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
-        )
+        pauseForOutgoingTransitionThen {
+            startActivity(
+                Intent(this, SearchActivity::class.java)
+                    .putExtra(SearchActivity.EXTRA_CHANNEL, viewModel.uiState.value.activeChannel.name)
+            )
+        }
     }
 
     private fun openAiChatPage() {
-        startActivity(Intent(this, AiChatActivity::class.java))
+        pauseForOutgoingTransitionThen {
+            startActivity(Intent(this, AiChatActivity::class.java))
+        }
+    }
+
+    private fun View.applyMainResponsiveHorizontalPadding() {
+        val density = resources.displayMetrics.density
+        val horizontal = (resources.displayMetrics.widthPixels * 0.04f)
+            .roundToInt()
+            .coerceIn((12f * density).roundToInt(), (22f * density).roundToInt())
+        setPaddingRelative(horizontal, paddingTop, horizontal, paddingBottom)
     }
 
     companion object {
-        private const val SWIPE_DISTANCE = 90
-        private const val SWIPE_VELOCITY = 120
+        private const val SWIPE_DISTANCE = 140
+        private const val SWIPE_INTENT_DISTANCE_RATIO = 0.6f
+        private const val SWIPE_DIRECTION_RATIO = 1.8f
+        private const val VERTICAL_LOCK_DISTANCE = 32
+        private const val VERTICAL_LOCK_DIRECTION_RATIO = 1.15f
+        private const val PAGE_SWITCH_COOLDOWN_MS = 500L
         private const val PAGE_SWITCH_DURATION = 320L
         private const val PAGE_SWITCH_GAP_DP = 10
+        private const val AD_INFO_PRELOAD_THRESHOLD = 5
+        private const val MEDIA_PREFETCH_AHEAD_COUNT = 5
+        private const val FEED_ITEM_CACHE_SIZE = 6
+        private const val SNAPSHOT_EXTRA_ITEMS = 2
+        private const val REFRESH_FADE_OUT_ALPHA = 0.35f
+        private const val REFRESH_FADE_OUT_DURATION = 120L
+        private const val REFRESH_FADE_IN_DURATION = 240L
     }
+
+    private data class VisibleSnapshot(
+        val items: List<AdItem>,
+        val firstItemOffset: Int
+    )
 }
